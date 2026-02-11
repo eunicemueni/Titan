@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { UserProfile } from "../types";
 
-const cleanJson = (text: string) => {
+const cleanJson = (text: string | undefined) => {
   if (!text) return "[]";
   try {
     const start = text.indexOf('[');
@@ -29,10 +29,9 @@ RULES:
 export const geminiService = {
   audioContext: null as AudioContext | null,
 
-  // Text-to-speech for system notifications
   async speak(text: string) {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text: `TITAN OS NOTIFICATION: ${text}` }] }],
@@ -64,9 +63,8 @@ export const geminiService = {
     return false;
   },
 
-  // Scrapes for 100% remote job opportunities
   async performUniversalScrape(industry: string, location: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `MISSION: Find 8 active 100% remote high-tier job openings in ${industry} (Region: ${location}). Return as JSON array.`,
@@ -90,12 +88,11 @@ export const geminiService = {
         },
       },
     });
-    return JSON.parse(cleanJson(response.text || "[]"));
+    return JSON.parse(cleanJson(response.text));
   },
 
-  // Tailors a full application package for a specific role
   async tailorJobPackage(role: string, company: string, profile: UserProfile, type: string = 'standard', contact: string = 'Hiring Lead') {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `OBJECTIVE: Synthesize high-stakes application for ${role} at ${company}. User Identity: ${profile.fullName}. Profile DNA: ${profile.masterCV}. Generate READY-TO-SEND email body, subject, cover letter, and a tailored resume summary.`,
@@ -114,12 +111,11 @@ export const geminiService = {
         }
       }
     });
-    return JSON.parse(cleanJson(response.text || '{}'));
+    return JSON.parse(cleanJson(response.text));
   },
 
-  // Scouts for high-velocity freelance gigs
   async scoutFlashGigs(profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `MISSION: Identify 6-10 high-velocity freelance gigs for ${profile.fullName} matching: ${Object.values(profile.expertiseBlocks).join(', ')}. Target platforms: Upwork, Toptal, Contra.`,
@@ -144,12 +140,11 @@ export const geminiService = {
         }
       }
     });
-    return JSON.parse(cleanJson(response.text || "[]"));
+    return JSON.parse(cleanJson(response.text));
   },
 
-  // Performs B2B gap analysis for companies
   async analyzeOperationalGaps(industry: string, location: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `TASK: Perform B2B gap analysis for top companies in ${industry} at ${location}. Identify operational logic deficits for automation services.`,
@@ -174,12 +169,11 @@ export const geminiService = {
         }
       }
     });
-    return JSON.parse(cleanJson(response.text || "[]"));
+    return JSON.parse(cleanJson(response.text));
   },
 
-  // Deep traces for specific contact emails
   async performDeepEmailScrape(company: string, domain: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `MISSION: Locate the specific hiring/executive contact email for ${company} (${domain}). Return JSON.`,
@@ -197,12 +191,11 @@ export const geminiService = {
         }
       }
     });
-    return JSON.parse(cleanJson(response.text || '{"email": "Not Found"}'));
+    return JSON.parse(cleanJson(response.text));
   },
 
-  // Generates high-stakes corporate proposals for Market Nexus
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `TASK: Generate a $${service.price} high-stakes corporate proposal for ${lead.name} for "${service.name}". Lead context: ${lead.hiringContext}.`,
@@ -222,19 +215,17 @@ export const geminiService = {
         }
       }
     });
-    return JSON.parse(cleanJson(response.text || '{}'));
+    return JSON.parse(cleanJson(response.text));
   },
 
-  // FIX: Added enrichCompanyEmail missing property
   async enrichCompanyEmail(company: string, website: string) {
     const domain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace('www.', '');
     const result = await this.performDeepEmailScrape(company, domain);
     return result.email === 'Not Found' ? null : result.email;
   },
 
-  // FIX: Added getOperationalAudit missing property
   async getOperationalAudit(prompt: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `${prompt}\n\nUser Context: ${profile.fullName}, ${profile.domain}.`,
@@ -243,9 +234,8 @@ export const geminiService = {
     return response.text || "Audit generation failed.";
   },
 
-  // FIX: Added generateB2BPitch missing property
   async generateB2BPitch(company: string, gaps: string[], solution: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Draft a high-velocity B2B pitch for ${company}. Gaps: ${gaps.join(', ')}. Solution: ${solution}. Lead: ${profile.fullName}.`,
@@ -254,9 +244,8 @@ export const geminiService = {
     return response.text || "Pitch synthesis failed.";
   },
 
-  // FIX: Added scoutNexusLeads missing property
   async scoutNexusLeads(industry: string, location: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Find 8 corporate leads in ${industry} (${location}) needing automation audits. Return JSON.`,
@@ -279,12 +268,11 @@ export const geminiService = {
         }
       }
     });
-    return JSON.parse(cleanJson(response.text || "[]"));
+    return JSON.parse(cleanJson(response.text));
   },
 
-  // FIX: Added generateVision missing property (Image Generation)
   async generateVision(prompt: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: { parts: [{ text: prompt }] },
@@ -300,9 +288,8 @@ export const geminiService = {
     return null;
   },
 
-  // FIX: Added processConsoleCommand missing property
   async processConsoleCommand(command: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `${command}\n\nContext: ${profile.fullName}`,
@@ -311,9 +298,8 @@ export const geminiService = {
     return response.text || "Command execution failure.";
   },
 
-  // FIX: Added scoutClientLeads missing property
   async scoutClientLeads(niche: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Identify 6 client leads for niche "${niche}" based on profile ${profile.domain}. Return JSON.`,
@@ -338,12 +324,11 @@ export const geminiService = {
         }
       }
     });
-    return JSON.parse(cleanJson(response.text || "[]"));
+    return JSON.parse(cleanJson(response.text));
   },
 
-  // FIX: Added tailorClientPitch missing property
   async tailorClientPitch(company: string, description: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Synthesize a client pitch for ${company}. Description: ${description}. Lead: ${profile.fullName}. Return JSON.`,
@@ -361,6 +346,6 @@ export const geminiService = {
         }
       }
     });
-    return JSON.parse(cleanJson(response.text || '{}'));
+    return JSON.parse(cleanJson(response.text));
   }
 };

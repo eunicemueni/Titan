@@ -4,7 +4,6 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Injecting all TITAN OS credentials directly into the client build
     'process.env.API_KEY': JSON.stringify('AIzaSyCxmktI5Kgb2nHfVHxs9UtSR9JCz5cTh0k'),
     'process.env.OXYLABS_USER': JSON.stringify('Eunnah100_QJl9q'),
     'process.env.OXYLABS_PASS': JSON.stringify('cV4sOJ=BSGFe1im'),

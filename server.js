@@ -10,7 +10,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// TITAN_OS CLOUD NODE UPLINK - Hardcoded for immediate deployment
+// TITAN_OS CLOUD NODE UPLINK
 const REDIS_URL = "rediss://default:WR4PsdBO788Qyav9olhP50pmO9rLt80e@redis-13106.c17.us-east-1-4.ec2.cloud.redislabs.com:13106";
 
 const redisOptions = {
@@ -22,7 +22,6 @@ const redisOptions = {
   }
 };
 
-// TLS is required for rediss:// connections (Redis Labs / Upstash)
 if (REDIS_URL.startsWith('rediss://')) {
   redisOptions.tls = { rejectUnauthorized: false };
 }
@@ -93,6 +92,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n==========================================`);
   console.log(`TITAN OS COMMAND HUB: ONLINE`);
   console.log(`PORT: ${PORT}`);
-  console.log(`STATUS: READY_FOR_DISPATCH`);
+  console.log(`NODE: database-MLIN3KYX`);
   console.log(`==========================================\n`);
 });
