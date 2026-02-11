@@ -1,8 +1,12 @@
 
 export const scrapingService = {
   authHeader() {
-    const username = "Eunnah100_QJl9q";
-    const password = "cV4sOJ=BSGFe1im";
+    const username = process.env.OXYLABS_USER || "";
+    const password = process.env.OXYLABS_PASS || "";
+    if (!username || !password) {
+      console.warn("SCRAPING_AUTH_WARNING: Missing OXYLABS_USER or OXYLABS_PASS env variables.");
+      return '';
+    }
     return 'Basic ' + btoa(`${username}:${password}`);
   },
 
@@ -18,12 +22,15 @@ export const scrapingService = {
       parse: true,
     };
 
+    const auth = this.authHeader();
+    if (!auth) return [];
+
     try {
       const response = await fetch('https://realtime.oxylabs.io/v1/queries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': this.authHeader(),
+          'Authorization': auth,
         },
         body: JSON.stringify(body),
       });
@@ -59,12 +66,15 @@ export const scrapingService = {
       parse: true,
     };
 
+    const auth = this.authHeader();
+    if (!auth) return [];
+
     try {
       const response = await fetch('https://realtime.oxylabs.io/v1/queries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': this.authHeader(),
+          'Authorization': auth,
         },
         body: JSON.stringify(body),
       });

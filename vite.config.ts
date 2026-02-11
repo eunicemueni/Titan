@@ -1,3 +1,4 @@
+
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -5,7 +6,9 @@ export default defineConfig({
   plugins: [react()],
   define: {
     'process.env': {
-      API_KEY: JSON.stringify(process.env.API_KEY)
+      API_KEY: JSON.stringify(process.env.API_KEY),
+      OXYLABS_USER: JSON.stringify(process.env.OXYLABS_USER),
+      OXYLABS_PASS: JSON.stringify(process.env.OXYLABS_PASS)
     }
   },
   build: {

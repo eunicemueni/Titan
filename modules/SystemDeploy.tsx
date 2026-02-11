@@ -24,7 +24,8 @@ const SystemDeploy: React.FC<SystemDeployProps> = ({ onLog }) => {
       }
 
       try {
-        const username = "Eunnah100_QJl9q";
+        // Checking for the presence of the Oxylabs environment variable
+        const username = process.env.OXYLABS_USER;
         if (username) setOxyStatus('CONNECTED');
         else setOxyStatus('ERROR');
       } catch (e) {
