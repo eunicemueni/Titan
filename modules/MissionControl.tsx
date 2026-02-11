@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { UserProfile, JobRecord, Mission, TelemetryLog, IndustryType, QueueStatus, SentRecord } from '../types';
 
@@ -32,7 +31,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
   const discoveredJobs = jobs.filter(j => j.status === 'discovered');
 
   return (
-    <div className="min-h-screen bg-[#02040a] p-6 md:p-12 space-y-12 pb-32 animate-in fade-in duration-700">
+    <div className="min-h-screen bg-[#02040a] p-6 md:p-12 space-y-12 pb-32">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div>
           <h1 className="text-5xl font-black text-white uppercase italic tracking-tighter leading-none">
@@ -86,7 +85,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
           </div>
         </div>
       ) : (
-        <div className="bg-slate-950 border border-white/5 rounded-[4rem] p-12 shadow-2xl space-y-8 animate-in slide-in-from-bottom-5">
+        <div className="bg-slate-950 border border-white/5 rounded-[4rem] p-12 shadow-2xl space-y-8">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>

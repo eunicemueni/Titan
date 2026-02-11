@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
 import { geminiService } from '../services/geminiService';
@@ -20,15 +19,8 @@ const Header: React.FC<HeaderProps> = ({
   const [searchValue, setSearchValue] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  useEffect(() => {
-    if (voiceEnabled) {
-      setIsSpeaking(true);
-      geminiService.speak(`Neural interface activated. TITAN OS is standing by for ${activePersona}. ${personaDomain} mode is active.`)
-        .finally(() => setIsSpeaking(false));
-    } else {
-      setIsSpeaking(false);
-    }
-  }, [voiceEnabled, activePersona, activeView, personaDomain]);
+  // Automatic voice greetings have been removed to keep the interface silent and professional.
+  // Voice interaction is now strictly manual via the toggle.
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
