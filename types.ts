@@ -12,9 +12,16 @@ export enum AppView {
   VAULT_SYNC = 'VAULT_SYNC'
 }
 
-export type PipelineStatus = 'DISPATCHED' | 'REPLY_RECEIVED' | 'INTERVIEW_SET' | 'OFFER_EXTENDED' | 'REJECTED' | 'ARCHIVED';
+export type PipelineStatus = 'DISPATCHED' | 'REPLY_RECEIVED' | 'INTERVIEW_SET' | 'OFFER_EXTENDED' | 'REJECTED' | 'ARCHIVED' | 'QUEUED';
 
-export type IndustryType = 'DATA_ANALYST' | 'ACTUARIAL' | 'FINANCE' | 'SALES' | 'AI_TRAINING' | 'FREELANCE' | 'GENERAL';
+export interface QueueStatus {
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+}
+
+export type IndustryType = 'DATA_ANALYST' | 'ACTUARIAL' | 'FINANCE' | 'SALES' | 'AI_TRAINING' | 'FREELANCE' | 'GENERAL' | 'INSURANCE' | 'PROJECT_MGMT' | 'OPERATIONS' | 'UNIVERSAL';
 
 export interface AppAnalytics {
   agentDetections: number;
@@ -55,18 +62,6 @@ export interface Mission {
   currentTask?: string;
 }
 
-export interface ClientLead {
-  id: string;
-  companyName: string;
-  type: 'AGENCY' | 'PUBLICATION' | 'CORPORATE' | 'ENTERPRISE';
-  website: string;
-  contactPerson?: string;
-  email?: string;
-  status: 'IDLE' | 'ENRICHING' | 'TAILORED' | 'SENT';
-  opportunityScore: number;
-  description: string;
-}
-
 export interface JobRecord {
   id: string;
   company: string;
@@ -75,7 +70,7 @@ export interface JobRecord {
   salary?: string;
   contactEmail?: string;
   description?: string;
-  status: 'discovered' | 'tailoring' | 'applying' | 'completed' | 'skipped';
+  status: 'discovered' | 'tailoring' | 'applying' | 'completed' | 'skipped' | 'queued';
   matchScore: number;
   timestamp: number;
   isQualified?: boolean;
@@ -115,6 +110,17 @@ export interface TargetedCompany {
   };
 }
 
+export interface ClientLead {
+  id: string;
+  companyName: string;
+  website: string;
+  description: string;
+  type: 'PUBLICATION' | 'AGENCY' | 'OTHER';
+  opportunityScore: number;
+  email?: string;
+  status: string;
+}
+
 export interface SentRecord {
   id: string;
   type: 'JOB_APPLICATION' | 'B2B_PITCH' | 'GIG_BID' | 'COL_OUTREACH' | 'SERVICE_OFFER' | 'FLASH_BID' | 'CLIENT_PITCH' | 'MISSION_RELAY';
@@ -123,6 +129,7 @@ export interface SentRecord {
   timestamp: number;
   status: PipelineStatus;
   industry?: IndustryType;
+  payload?: string; // New field for viewing content in ledger
 }
 
 export interface TelemetryLog {

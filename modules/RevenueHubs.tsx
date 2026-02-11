@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { UserProfile, TelemetryLog, SentRecord } from '../types';
 import { geminiService } from '../services/geminiService';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { SERVICE_CATALOG } from '../constants';
 
 interface YieldNode {
   company: string;
@@ -17,13 +18,11 @@ interface YieldNode {
   status: 'IDLE' | 'ENRICHING' | 'TAILORING' | 'DISPATCHING' | 'SENT' | 'SHORTED';
 }
 
-// Fix: Added onBack to RevenueHubsProps to match usage in App.tsx
 interface RevenueHubsProps {
   profile: UserProfile;
   onLog: (msg: string, level: TelemetryLog['level']) => void;
   updateStats: (updates: Partial<UserProfile['stats']>) => void;
   onSent: (record: Omit<SentRecord, 'id' | 'timestamp' | 'status'>) => void;
-  onProgress?: (current: number, total: number, label: string) => void;
   onBack: () => void;
 }
 
@@ -31,7 +30,7 @@ const YieldPulse: React.FC<{ value: number }> = ({ value }) => {
   const data = useMemo(() => {
     return Array.from({ length: 12 }).map((_, i) => ({
       time: i,
-      val: (value / 1000) + Math.random() * 8 - 4 + (Math.cos(i / 1.5) * 5)
+      val: (value / 500) + Math.random() * 8 - 4 + (Math.cos(i / 1.5) * 5)
     }));
   }, [value]);
 
@@ -67,8 +66,13 @@ const RevenueHubs: React.FC<RevenueHubsProps> = ({ profile, onLog, updateStats, 
     
     try {
       const analyses = await geminiService.analyzeOperationalGaps(companyType, location);
-      setResults(analyses.map((a: any) => ({ ...a, status: 'IDLE' })));
-      onLog(`Located ${analyses.length} deficit nodes.`, 'success');
+      setResults(analyses.map((a: any) => ({ 
+        ...a, 
+        status: 'IDLE',
+        // Cap projected value to match our High-Velocity catalog if not specified
+        projectedValue: a.projectedValue > 2000 ? 1999 : a.projectedValue || 1250 
+      })));
+      onLog(`Located ${analyses.length} deficit nodes in the High-Velocity Zone.`, 'success');
     } catch (err) {
       onLog("Analysis failed.", 'error');
     } finally {
@@ -86,13 +90,13 @@ const RevenueHubs: React.FC<RevenueHubsProps> = ({ profile, onLog, updateStats, 
     setResults(prev => prev.map(r => r.company === companyName ? { ...r, status: 'TAILORING' } : r));
     
     const auditReport = await geminiService.getOperationalAudit(
-      `Deep operational audit: ${node.company}. Find 3 high-impact efficiency gaps and map out a $5,000 solution.`, 
+      `Deep operational audit: ${node.company}. Find 3 high-impact efficiency gaps and map out a $${node.projectedValue} solution. Focus: High-Velocity implementation.`, 
       profile
     );
 
     const pitch = await geminiService.generateB2BPitch(companyName, node.gaps, node.solution, profile);
     
-    const subject = `Strategic Efficiency Proposal - ${node.company}`;
+    const subject = `Strategic Efficiency Proposal: $${node.projectedValue} Deployment - ${node.company}`;
     const mailtoUrl = `mailto:${email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(pitch || '')}`;
     window.open(mailtoUrl, '_blank');
 
@@ -110,30 +114,37 @@ const RevenueHubs: React.FC<RevenueHubsProps> = ({ profile, onLog, updateStats, 
       subject: subject
     });
 
-    onLog(`RELAY TRIGGERED: B2B Proposal draft dispatched for ${companyName}.`, 'success');
+    onLog(`RELAY TRIGGERED: High-Velocity Proposal ($${node.projectedValue}) dispatched for ${companyName}.`, 'success');
   };
 
   const activeNodes = useMemo(() => results.filter(r => r.status !== 'SHORTED'), [results]);
 
   return (
     <div className="space-y-8 pb-24 px-10 md:px-20">
-      {/* Fix: Added back button to match JobAutopilot pattern and use onBack prop */}
       <div className="flex justify-between items-center mb-10 pt-10">
-         <button onClick={onBack} className="flex items-center gap-4 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7"/></svg>
+         <button onClick={onBack} className="flex items-center gap-4 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all group">
+            <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7"/></svg>
             BACK TO COMMAND
          </button>
+         <div className="flex gap-4">
+            <div className="px-6 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+               <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Procurement Bypass: ACTIVE</span>
+            </div>
+            <div className="px-6 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full">
+               <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest">Pricing Zone: $99-$1,999</span>
+            </div>
+         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-purple-900/20 to-slate-950 border border-purple-500/20 p-12 rounded-[4rem] shadow-2xl relative overflow-hidden">
-         <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 blur-[150px] pointer-events-none"></div>
+      <div className="bg-gradient-to-br from-purple-900/20 to-slate-950 border border-purple-500/20 p-12 rounded-[4rem] shadow-2xl relative overflow-hidden group">
+         <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 blur-[150px] pointer-events-none group-hover:bg-purple-500/20 transition-all duration-1000"></div>
          <div className="flex flex-col md:flex-row items-center gap-10">
-            <div className="w-24 h-24 bg-purple-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl">
+            <div className="w-24 h-24 bg-purple-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl transition-transform group-hover:scale-110">
               <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             <div className="flex-1 space-y-3">
-               <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic leading-none">B2B Pitch Machine</h2>
-               <p className="text-sm text-slate-400 font-black uppercase tracking-widest">Autonomous Revenue Identification & Outreach Engine.</p>
+               <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic leading-none">High-Velocity Revenue Hub</h2>
+               <p className="text-sm text-slate-400 font-black uppercase tracking-widest">Bypassing Procurement via Frictionless Asset Deployment.</p>
             </div>
          </div>
       </div>
@@ -143,28 +154,28 @@ const RevenueHubs: React.FC<RevenueHubsProps> = ({ profile, onLog, updateStats, 
           <input type="text" placeholder="Sector (e.g. Fintech)..." className="bg-black border border-slate-800 rounded-3xl px-8 py-6 text-white text-lg font-bold outline-none focus:border-purple-500 transition-all" value={companyType} onChange={(e) => setCompanyType(e.target.value)} />
           <input type="text" placeholder="Targeting Area..." className="bg-black border border-slate-800 rounded-3xl px-8 py-6 text-white text-lg font-bold outline-none focus:border-purple-500 transition-all" value={location} onChange={(e) => setLocation(e.target.value)} />
         </div>
-        <button onClick={handleGapAnalysis} disabled={loading || !companyType} className="w-full bg-white text-black hover:bg-purple-600 hover:text-white font-black py-7 rounded-[2rem] uppercase text-sm tracking-[0.4em] transition-all shadow-xl">
-          {loading ? 'Performing Audit...' : 'Identify High-Value Deficit Nodes'}
+        <button onClick={handleGapAnalysis} disabled={loading || !companyType} className="w-full bg-white text-black hover:bg-purple-600 hover:text-white font-black py-7 rounded-[2rem] uppercase text-sm tracking-[0.4em] transition-all shadow-xl active:scale-95">
+          {loading ? 'Performing Audit...' : 'Identify Frictionless Deficit Nodes'}
         </button>
       </div>
 
       {activeNodes.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {activeNodes.map((node, i) => (
-            <div key={i} className={`p-12 border rounded-[4rem] transition-all flex flex-col justify-between min-h-[580px] group ${node.status === 'SENT' ? 'border-purple-500 bg-purple-950/10 shadow-2xl' : 'border-slate-800 bg-slate-950'}`}>
+            <div key={i} className={`p-12 border rounded-[4rem] transition-all duration-500 flex flex-col justify-between min-h-[580px] group ${node.status === 'SENT' ? 'border-purple-500 bg-purple-950/10 shadow-2xl' : 'border-slate-800 bg-slate-950 hover:border-white/20'}`}>
                <div>
                   <div className="flex justify-between items-start mb-10">
-                     <h3 className="text-2xl font-black text-white uppercase tracking-tighter leading-none pr-6">{node.company}</h3>
+                     <h3 className="text-2xl font-black text-white uppercase tracking-tighter leading-none pr-6 group-hover:text-purple-400 transition-colors">{node.company}</h3>
                      <div className="bg-purple-500/10 border border-purple-500/20 px-4 py-2 rounded-full">
-                        <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">${node.projectedValue.toLocaleString()} VALUE</span>
+                        <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">${node.projectedValue.toLocaleString()} ASK</span>
                      </div>
                   </div>
                   <YieldPulse value={node.projectedValue} />
                   
                   <div className="mt-12 space-y-6">
-                     <p className="text-[10px] text-slate-600 uppercase font-black tracking-widest">Located Deficits:</p>
+                     <p className="text-[10px] text-slate-600 uppercase font-black tracking-widest">Identified Logic Gaps:</p>
                      {node.gaps.map((gap, idx) => (
-                       <div key={idx} className="flex gap-5 p-5 bg-black/40 rounded-2xl border border-slate-900">
+                       <div key={idx} className="flex gap-5 p-5 bg-black/40 rounded-2xl border border-slate-900 group-hover:border-purple-500/20 transition-all">
                           <span className="text-purple-500 font-black">»</span>
                           <span className="text-[12px] text-slate-400 font-bold uppercase tracking-tight leading-tight">{gap}</span>
                        </div>
@@ -181,7 +192,7 @@ const RevenueHubs: React.FC<RevenueHubsProps> = ({ profile, onLog, updateStats, 
                       onClick={() => handleAutonomousDispatch(node.company)}
                       className="w-full bg-purple-600 text-white py-6 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-purple-500 transition-all active:scale-95 disabled:opacity-30"
                     >
-                      {node.status === 'IDLE' ? 'Prepare & Auto-Relay' : 'Triggering System Draft...'}
+                      {node.status === 'IDLE' ? `Dispatch $${node.projectedValue} Proposal` : 'Establishing Uplink...'}
                     </button>
                   )}
                </div>
@@ -198,7 +209,7 @@ const RevenueHubs: React.FC<RevenueHubsProps> = ({ profile, onLog, updateStats, 
                   <div className="w-16 h-16 bg-purple-600 rounded-[2rem] flex items-center justify-center text-white font-black text-3xl shadow-lg">✓</div>
                   <div>
                     <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter leading-none">B2B Audit: {viewingPitch.company}</h3>
-                    <p className="text-xs text-slate-500 uppercase font-black tracking-widest mt-2">STATUS: DRAFT TRIGGERED AUTOMATICALLY</p>
+                    <p className="text-xs text-slate-500 uppercase font-black tracking-widest mt-2">VALUE: $${viewingPitch.projectedValue} | STATUS: TRANSMITTED</p>
                   </div>
                 </div>
                 <button onClick={() => setViewingPitch(null)} className="p-4 text-slate-300 hover:text-slate-900 transition-all"><svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12" /></svg></button>
@@ -207,7 +218,7 @@ const RevenueHubs: React.FC<RevenueHubsProps> = ({ profile, onLog, updateStats, 
               <div className="flex-1 overflow-y-auto p-16 lg:p-24 bg-slate-50 custom-scrollbar">
                   <div className="max-w-5xl mx-auto space-y-12">
                      <div className="bg-purple-50 border border-purple-100 p-12 rounded-[3rem] space-y-6">
-                        <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-[0.3em]">Neural Audit Dispatch</h4>
+                        <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-[0.3em]">Neural Efficiency Diagnosis</h4>
                         <div className="text-lg font-serif italic text-slate-800 leading-relaxed whitespace-pre-wrap">
                            {viewingPitch.auditReport}
                         </div>

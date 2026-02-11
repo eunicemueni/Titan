@@ -2,7 +2,7 @@
 import React from 'react';
 
 export const SYSTEM_NAME = "TITAN COMMAND AI";
-export const VERSION = "6.4.2-STABLE";
+export const VERSION = "7.0.0-PRO";
 
 export const COLORS = {
   primary: '#6366f1',
@@ -33,34 +33,33 @@ export const SERVICE_CATALOG: ServiceBlueprint[] = [
   {
     id: 'neural_twin',
     name: 'Enterprise Neural Twin',
-    price: 4500,
-    description: 'Autonomous AI Executive Proxy. Custom-trained on leadership logic to represent the brand in 24/7 stakeholder management and decision-making.',
+    price: 1999,
+    description: 'A 1:1 Digital Clone of company operational logic. Replicates leadership decision-making 24/7. This is our flagship elite proxy for total operational autonomy.',
     icon: '🧬',
-    isFutureAsset: true,
-    salesHook: "Strategic audit suggests an 'Executive Bandwidth' gap. I have modeled a conceptual Neural Twin to handle high-level logic. Implementation: $4,500."
+    salesHook: "Strategic audit suggests an 'Executive Bandwidth' gap. I have modeled a conceptual Neural Twin of your operational logic to handle high-level logic. Implementation: $1,999 (Procurement Exempt)."
   },
   {
     id: 'risk_nexus',
     name: 'Stochastic Risk Nexus',
-    price: 1850,
-    description: 'Bespoke actuarial and financial modeling framework using FIS Prophet logic to identify and mitigate long-term liability friction.',
+    price: 1450,
+    description: 'Advanced actuarial and risk modeling framework. We clone your risk history into a 10-year mitigation map to eliminate liability friction.',
     icon: '📈',
-    salesHook: "Identified KES 50M+ in potential liability exposure. My Risk Nexus framework provides a 10-year stochastic mitigation map. Engagement: $1,850."
+    salesHook: "Identified significant liability exposure. My Risk Nexus framework provides a custom-cloned stochastic mitigation map. Engagement: $1,450."
   },
   {
     id: 'knowledge_brain',
     name: 'Neural Knowledge Brain',
-    price: 1250,
-    description: 'Conversion of fragmented internal corporate data into a centralized, queryable Neural Nexus for 15% efficiency gains across staff nodes.',
+    price: 850,
+    description: 'High-tier data ingestion asset. We synthesize a centralized Neural Nexus that clones the collective intelligence of your staff into a queryable AI brain.',
     icon: '🧠',
-    salesHook: "Internal data fragmentation is leaking 12% of staff productivity. The Neural Brain consolidates all intelligence. Setup: $1,250."
+    salesHook: "Internal data fragmentation is leaking staff productivity. The Neural Brain clones and consolidates all intelligence. Setup: $850."
   },
   {
     id: 'strategic_audit',
     name: 'Operations Deficit Audit',
-    price: 399,
-    description: 'Deep-dive analytical audit of corporate operational friction. Mapping the path to $50k+ in annual operational savings.',
+    price: 99,
+    description: 'The frictionless entry point. A deep-dive analytical trace identifying exact logic failures and mapping the path to $100k+ in annual savings.',
     icon: '📊',
-    salesHook: "I have identified three critical friction nodes in your current workflow. Detailed Ops Audit: $399."
+    salesHook: "I have identified three critical friction nodes in your current workflow. Detailed Logic Audit: $99 (Instant Approval Tier)."
   }
 ];

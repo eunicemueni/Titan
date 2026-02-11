@@ -27,8 +27,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
     {
       label: 'Revenue Sync',
       items: [
-        { id: AppView.INCOME_B2B, label: 'Revenue Hub', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2' },
         { id: AppView.INCOME_GIGS, label: 'Gig Pulse', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+        { id: AppView.INCOME_B2B, label: 'Revenue Hub', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2' },
         { id: AppView.MARKET_NEXUS, label: 'Market Nexus', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
       ]
     },

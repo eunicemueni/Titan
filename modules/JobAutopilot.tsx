@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { JobRecord, UserProfile, TelemetryLog, SentRecord } from '../types';
 import { geminiService } from '../services/geminiService';
 
@@ -13,43 +13,47 @@ interface ScraperNodeProps {
   onBack: () => void;
   bridgeStatus: 'OFFLINE' | 'CONNECTING' | 'ONLINE';
   onReconnect: () => void;
+  targetDailyCap: number;
 }
 
-const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs, onSent, onBack }) => {
+const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs, onBack, targetDailyCap }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkOperating, setIsBulkOperating] = useState(false);
-  const [viewingPackage, setViewingPackage] = useState<JobRecord | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   
   const [query, setQuery] = useState('');
-  const [location, setLocation] = useState('Worldwide');
-  const [salaryFilter, setSalaryFilter] = useState('');
+  const [location, setLocation] = useState('USA Remote-Only & Worldwide Distributed');
 
-  const handleCloudDispatch = async () => {
-    if (selectedIds.size === 0 || isBulkOperating) return;
+  const visibleJobs = useMemo(() => jobs.filter(j => j.status === 'discovered'), [jobs]);
+  const allSelected = visibleJobs.length > 0 && visibleJobs.every(j => selectedIds.has(j.id));
+
+  const handleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+      onLog("SELECTION_PROTOCOL: Nodes cleared.", "warning");
+    } else {
+      const allIds = new Set(visibleJobs.map(j => j.id));
+      setSelectedIds(allIds);
+      onLog(`SELECTION_PROTOCOL: ${allIds.size} nodes captured in selection buffer.`, "info");
+    }
+  };
+
+  const handleMassQueue = async () => {
     setIsBulkOperating(true);
-    onLog(`Initiating strategic outreach for ${selectedIds.size} opportunities...`, "info");
+    setShowConfirmation(false);
+    onLog(`Initiating UHF Autonomous Mass Dispatch for ${selectedIds.size} nodes...`, "info");
 
     const selectedJobs = jobs.filter(j => selectedIds.has(j.id));
+    let successCount = 0;
     
     try {
-      for (const job of selectedJobs) {
-        onLog(`Generating tailored identity package for ${job.company}...`, "info");
-        const pkg = await geminiService.tailorJobPackage(job.role, job.company, profile, 'standard');
-        
-        const subject = pkg.subject || `Strategic Proposal: ${job.role} - ${profile.fullName}`;
-        const body = pkg.emailBody || '';
-        const recipient = job.contactEmail || 'hr@corporate.com';
-
-        window.open(`mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
-        
-        setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'completed', tailoredPackage: pkg } : j));
-        onSent({ type: 'JOB_APPLICATION', recipient: job.company, subject });
-        onLog(`Outreach relay successful for ${job.company}.`, "success");
-      }
-      geminiService.speak(`Batch outreach completed. All tailored dossiers have been dispatched.`);
+      // Direct state update for high-speed responsiveness
+      setJobs(prev => prev.map(j => selectedIds.has(j.id) ? { ...j, status: 'queued' } : j));
+      successCount = selectedJobs.length;
+      onLog(`SUCCESS: ${successCount} nodes committed to UHF Autonomous Buffer.`, "success");
     } catch (err: any) {
-      onLog("Outreach interrupted: Neural buffer exception.", "error");
+      onLog("UHF Relay interrupted.", "error");
     } finally {
       setIsBulkOperating(false);
       setSelectedIds(new Set());
@@ -57,26 +61,40 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
   };
 
   const handleGlobalScrape = async () => {
-    if (!query.trim() || isScanning) return;
+    if (!query) {
+      onLog("Discovery Error: Role parameter required.", "warning");
+      return;
+    }
     setIsScanning(true);
-    onLog(`Scanning global markets for "${query}" matching your profile...`, 'info');
+    onLog(`${targetDailyCap >= 1000 ? 'UHF' : 'PRECISION'}_SCAN: Initiated. Targeting web nodes...`, 'info');
     
     try {
-      const results = await geminiService.discoverJobPostings(query, location, salaryFilter);
-      const newJobs: JobRecord[] = results.map((j: any, i: number) => ({
-        ...j,
-        id: `job-${Date.now()}-${i}`,
+      const geminiResults = await geminiService.performUniversalScrape(query, location);
+      const validResults = Array.isArray(geminiResults) ? geminiResults : [];
+      
+      const mapped: JobRecord[] = validResults.map((j: any, i: number) => ({
+        id: `gem-${Date.now()}-${i}`,
+        company: j.company || "Unknown Entity",
+        role: j.role || query,
+        location: j.location || location,
+        description: j.description || "No description provided by node.",
+        sourceUrl: j.sourceUrl || "",
         status: 'discovered' as const,
         timestamp: Date.now(),
-        matchScore: 94 + Math.floor(Math.random() * 6),
-        isQualified: true
+        matchScore: 94 + Math.floor(Math.random() * 6)
       }));
-      setJobs(prev => [...newJobs, ...prev]);
-      onLog(`Discovery complete: ${results.length} relevant nodes indexed.`, 'success');
-      geminiService.speak(`Found ${results.length} opportunities that strongly match your expertise.`);
+
+      setJobs(prev => {
+        const combined = [...mapped, ...prev];
+        const unique = Array.from(new Map(combined.map(item => [item.sourceUrl || item.id, item])).values()).slice(0, 500);
+        return unique;
+      });
+      onLog(`Captured ${mapped.length} nodes for UHF dispatch.`, 'success');
     } catch (err: any) { 
-      onLog("Market discovery failed: Network timeout.", "error"); 
-    } finally { setIsScanning(false); }
+      onLog(`Discovery Exception: ${err.message}`, "error"); 
+    } finally { 
+      setIsScanning(false); 
+    }
   };
 
   const toggleSelect = (id: string) => {
@@ -86,185 +104,143 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
     setSelectedIds(next);
   };
 
-  const visibleJobs = useMemo(() => jobs.filter(j => j.status !== 'skipped'), [jobs]);
-
-  if (viewingPackage && viewingPackage.tailoredPackage) {
-    return (
-      <div className="min-h-screen bg-[#02040a] p-10 lg:p-24 animate-in fade-in duration-500">
-        <div className="max-w-7xl mx-auto space-y-16">
-           <div className="flex justify-between items-center">
-              <button onClick={() => setViewingPackage(null)} className="flex items-center gap-4 text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] hover:text-white transition-all">
-                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7"/></svg>
-                 Back to Discovery Hub
-              </button>
-              <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase leading-none">Dossier Audit: {viewingPackage.company}</h2>
-           </div>
-           
-           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              <div className="bg-slate-950 border border-white/5 p-16 rounded-[4rem] shadow-2xl space-y-10">
-                 <h3 className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.4em]">Neural Email Relay</h3>
-                 <div className="text-lg font-serif italic text-slate-300 leading-relaxed whitespace-pre-wrap h-[600px] overflow-y-auto custom-scrollbar pr-6">
-                    {viewingPackage.tailoredPackage.emailBody}
-                 </div>
-              </div>
-              <div className="bg-white border border-slate-200 p-16 rounded-[4rem] shadow-2xl space-y-10">
-                 <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.4em]">Identity DNA Overlay</h3>
-                 <div className="text-xs font-mono text-slate-800 leading-relaxed whitespace-pre-wrap h-[600px] overflow-y-auto custom-scrollbar pr-6">
-                    {viewingPackage.tailoredPackage.cv}
-                 </div>
-              </div>
-           </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-10 lg:p-20 max-w-[1600px] mx-auto space-y-20 animate-in fade-in duration-700 pb-40">
+    <div className="p-10 lg:p-20 max-w-[1600px] mx-auto space-y-20 animate-in fade-in duration-700 pb-40 relative">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-10">
-         <button onClick={onBack} className="flex items-center gap-4 text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] hover:text-white transition-all">
+         <button onClick={onBack} className="flex items-center gap-4 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7"/></svg>
             Command Center
          </button>
          <div className="text-left md:text-right space-y-2">
-            <h1 className="text-6xl font-black text-white italic tracking-tighter uppercase leading-none">Neural Discovery</h1>
-            <p className="text-indigo-500 text-[10px] font-black uppercase tracking-[0.5em]">Autonomous Global Lead Acquisition</p>
+            <h1 className="text-6xl font-black text-white italic tracking-tighter uppercase leading-none">
+              {targetDailyCap >= 1000 ? 'UHF Neural Scanner' : 'Global Discovery'}
+            </h1>
+            <p className="text-amber-500 text-[10px] font-black uppercase tracking-[0.5em] animate-pulse">
+              NODE_HEALTH: OPTIMAL | SCAN_READY
+            </p>
          </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-        <div className="lg:col-span-8">
-           <div className="bg-slate-950 border border-white/5 rounded-[4rem] p-16 lg:p-24 shadow-2xl space-y-12 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_70%_20%,_rgba(99,102,241,0.05),_transparent_60%)] pointer-events-none"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em] ml-6">Target Role / Sector</label>
-                  <input type="text" placeholder="e.g. Senior Actuarial Analyst..." className="w-full bg-black border border-white/5 rounded-[2.5rem] px-10 py-6 text-white text-xl font-black outline-none focus:border-indigo-500 transition-all shadow-inner" value={query} onChange={(e) => setQuery(e.target.value)} />
-                </div>
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em] ml-6">Min Annual Yield</label>
-                  <input type="text" placeholder="$140,000+..." className="w-full bg-black border border-white/5 rounded-[2.5rem] px-10 py-6 text-white text-xl font-black outline-none focus:border-indigo-500 transition-all shadow-inner" value={salaryFilter} onChange={(e) => setSalaryFilter(e.target.value)} />
-                </div>
-              </div>
-
-              <button 
-                onClick={handleGlobalScrape} 
-                disabled={isScanning || !query} 
-                className="w-full py-8 bg-indigo-600 text-white rounded-[2.5rem] font-black uppercase text-sm tracking-[0.4em] shadow-2xl hover:bg-white hover:text-black transition-all active:scale-[0.98] relative z-10"
-              >
-                {isScanning ? 'Establishing Neural Relay Cluster...' : 'Deploy Global Market Scraper'}
-              </button>
+      <div className="bg-slate-950 border border-amber-500/20 rounded-[4rem] p-16 lg:p-24 shadow-2xl space-y-12 relative overflow-hidden group">
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
+           <div className="space-y-4">
+             <label className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em] ml-6">Distributed Role Type</label>
+             <input type="text" placeholder="e.g. Senior Data Analyst..." className="w-full bg-black border border-white/5 rounded-[2.5rem] px-10 py-6 text-white text-xl font-black outline-none focus:border-amber-500 transition-all shadow-inner" value={query} onChange={(e) => setQuery(e.target.value)} />
            </div>
-        </div>
-
-        <div className="lg:col-span-4">
-           <div className="bg-slate-950 border border-white/5 p-12 rounded-[4rem] shadow-2xl space-y-10 h-full flex flex-col justify-between">
-              <div>
-                <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-[0.4em] flex items-center gap-4 mb-10">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_#10b981]"></div>
-                  Security Matrix
-                </h3>
-                <div className="space-y-6 font-mono text-[10px] text-slate-600">
-                  <div className="flex justify-between border-b border-white/5 pb-3">
-                      <span className="uppercase text-slate-800">Fingerprint:</span>
-                      <span className="text-indigo-500">TITAN_v6.4_CLOAKED</span>
-                  </div>
-                  <div className="flex justify-between border-b border-white/5 pb-3">
-                      <span className="uppercase text-slate-800">Bot Evasion:</span>
-                      <span className="text-emerald-500">MAX_LEVEL</span>
-                  </div>
-                  <div className="flex justify-between border-b border-white/5 pb-3">
-                      <span className="uppercase text-slate-800">Proxy Mode:</span>
-                      <span className="text-indigo-500">ROTATING_RESIDENTIAL</span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-[9px] text-slate-800 leading-relaxed italic border-t border-white/5 pt-6 uppercase font-bold tracking-widest">
-                System utilizes high-fidelity browsing telemetry to ensure 100% stealth and discovery integrity.
-              </p>
+           <div className="space-y-4">
+             <label className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em] ml-6">Target Geography</label>
+             <input type="text" className="w-full bg-black border border-white/5 rounded-[2.5rem] px-10 py-6 text-white text-xl font-black outline-none focus:border-amber-500 transition-all shadow-inner" value={location} onChange={(e) => setLocation(e.target.value)} />
            </div>
-        </div>
+         </div>
+         <button onClick={handleGlobalScrape} disabled={isScanning} className="w-full py-10 bg-white text-black rounded-[2.5rem] font-black uppercase text-lg tracking-[0.5em] hover:bg-amber-500 transition-all active:scale-[0.98] relative overflow-hidden">
+           {isScanning && <div className="absolute inset-0 bg-indigo-600 animate-pulse"></div>}
+           <span className="relative z-10">{isScanning ? 'Synchronizing Neural Shards...' : 'Engage Global Scan'}</span>
+         </button>
       </div>
 
-      {/* Discovery Feed */}
       <div className="space-y-10">
-        <div className="flex items-center justify-between border-b border-white/5 pb-10">
-          <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.6em] flex items-center gap-6">
-            <span className="w-12 h-px bg-indigo-500/30"></span>
-            Opportunity Buffer ({visibleJobs.length})
-          </h3>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/5 pb-10 gap-6">
+          <div className="flex items-center gap-6">
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.6em] flex items-center gap-6">
+              <span className="w-12 h-px bg-amber-500/30"></span>
+              Discovery Stream ({visibleJobs.length})
+            </h3>
+            {visibleJobs.length > 0 && (
+              <button 
+                onClick={handleSelectAll}
+                className={`px-6 py-2 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${
+                  allSelected 
+                    ? 'bg-amber-500 text-black border-amber-500' 
+                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/30'
+                }`}
+              >
+                {allSelected ? 'Deselect All' : 'Select All Gigs'}
+              </button>
+            )}
+          </div>
           {selectedIds.size > 0 && (
             <button 
-              onClick={handleCloudDispatch}
-              disabled={isBulkOperating}
-              className="px-12 py-5 bg-white text-black rounded-[2rem] text-xs font-black uppercase tracking-[0.4em] hover:bg-indigo-600 hover:text-white transition-all shadow-2xl animate-in slide-in-from-right-10"
+              onClick={() => setShowConfirmation(true)}
+              className="px-12 py-5 bg-amber-500 text-black rounded-[2rem] text-xs font-black uppercase tracking-[0.4em] hover:bg-white transition-all shadow-2xl animate-in slide-in-from-right-10"
             >
-              {isBulkOperating ? 'Processing Relays...' : `Execute Direct Dispatch (${selectedIds.size})`}
+              Authorize Mass Dispatch ({selectedIds.size})
             </button>
           )}
         </div>
+
+        {isScanning && visibleJobs.length === 0 && (
+           <div className="py-40 text-center space-y-8 animate-pulse">
+              <div className="w-20 h-20 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <p className="text-xl font-black text-white uppercase tracking-[0.5em]">Neural Grounding...</p>
+           </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10">
           {visibleJobs.map(job => (
             <div 
               key={job.id} 
               onClick={() => toggleSelect(job.id)}
-              className={`p-12 rounded-[4.5rem] border transition-all duration-500 flex flex-col justify-between min-h-[520px] relative group cursor-pointer ${
-                selectedIds.has(job.id) ? 'border-indigo-500 bg-indigo-600/5 scale-[1.02] shadow-2xl' : 
-                job.status === 'completed' ? 'border-emerald-500/30 bg-emerald-500/5 shadow-xl' : 'border-white/5 bg-slate-950 hover:border-white/20'
+              className={`p-12 rounded-[4.5rem] border transition-all duration-500 flex flex-col justify-between min-h-[480px] relative group cursor-pointer ${
+                selectedIds.has(job.id) ? 'border-amber-500 bg-amber-500/5 scale-[1.02] shadow-2xl' : 'border-white/5 bg-slate-950 hover:border-white/20'
               }`}
             >
               <div className="absolute top-10 right-10">
-                 <div className={`w-8 h-8 rounded-2xl border-2 transition-all flex items-center justify-center ${selectedIds.has(job.id) ? 'bg-indigo-600 border-indigo-600 shadow-lg' : 'border-white/10'}`}>
-                    {selectedIds.has(job.id) && <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7"/></svg>}
+                 <div className={`w-8 h-8 rounded-2xl border-2 transition-all flex items-center justify-center ${selectedIds.has(job.id) ? 'bg-amber-600 border-amber-600 shadow-lg' : 'border-white/10'}`}>
+                    {selectedIds.has(job.id) && <svg className="w-5 h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7"/></svg>}
                  </div>
               </div>
-
               <div>
                 <div className="flex justify-between items-start mb-8">
-                  <span className={`text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest ${job.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-indigo-500/10 text-indigo-400'}`}>
-                      {job.status === 'completed' ? 'Dispatched' : `Match_Pulse: ${job.matchScore}%`}
+                  <span className="text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest bg-amber-500/10 text-amber-500">
+                      MATCH: {job.matchScore}%
                   </span>
+                  <span className="text-[8px] font-mono text-slate-700 uppercase tracking-widest">UHF_READY</span>
                 </div>
-                
-                <h4 className="font-black text-white text-3xl italic tracking-tighter leading-tight mb-2 group-hover:text-indigo-400 transition-colors uppercase">{job.role}</h4>
+                <h4 className="font-black text-white text-3xl italic tracking-tighter leading-tight mb-2 uppercase group-hover:text-amber-500 transition-colors">{job.role}</h4>
                 <p className="text-[11px] text-slate-500 font-black uppercase tracking-[0.4em] mb-10">{job.company}</p>
-                
                 <div className="bg-black/60 border border-white/5 rounded-[3rem] p-10 min-h-[160px] flex items-center mb-8 relative">
-                   <div className="absolute -top-3 left-10 px-4 py-1 bg-slate-950 rounded-lg text-[9px] font-black text-slate-700 uppercase tracking-[0.4em] border border-white/5">Neural Gap Analysis</div>
                    <p className="text-xs text-slate-400 italic leading-relaxed font-bold uppercase tracking-tight">
-                      "Projected Resolution: Positioning profile as the primary strategic node for ${job.company}'s current operational friction point."
+                      {job.description}
                    </p>
                 </div>
-
-                {job.status === 'completed' && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setViewingPackage(job); }}
-                    className="w-full py-4 border border-emerald-500/20 rounded-2xl text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] hover:bg-emerald-500 hover:text-white transition-all shadow-xl"
-                  >
-                    Audit Dispatch Assets
-                  </button>
-                )}
               </div>
-              
               <div className="mt-10 flex items-center justify-between border-t border-white/5 pt-8 text-[10px] font-black text-slate-900 uppercase tracking-[0.4em]">
-                 <div className="flex gap-2">
-                    <div className={`w-2 h-2 rounded-full ${selectedIds.has(job.id) ? 'bg-indigo-500 shadow-[0_0_8px_#6366f1]' : 'bg-slate-900'}`}></div>
-                    <div className={`w-2 h-2 rounded-full ${job.status === 'completed' ? 'bg-emerald-500' : 'bg-slate-900'}`}></div>
-                 </div>
-                 <span>{selectedIds.has(job.id) ? 'Queued' : 'Buffered'}</span>
+                 <span className="text-indigo-500">{job.location.toUpperCase()}</span>
+                 <div className={`w-2 h-2 rounded-full ${selectedIds.has(job.id) ? 'bg-amber-500 shadow-[0_0_8px_#f59e0b]' : 'bg-slate-900'}`}></div>
               </div>
             </div>
           ))}
-
-          {visibleJobs.length === 0 && !isScanning && (
-            <div className="col-span-full py-60 text-center border-2 border-dashed border-white/5 rounded-[5rem] opacity-10">
-               <p className="text-4xl font-black uppercase tracking-[1em]">Buffer Idle</p>
-               <p className="text-[11px] font-black text-indigo-500 uppercase mt-8 tracking-[0.5em]">Initiate Market Scan to Populate Lead Nodes</p>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* CONFIRMATION MODAL */}
+      {showConfirmation && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-8 bg-black/95 backdrop-blur-3xl animate-in fade-in">
+           <div className="max-w-xl w-full bg-slate-950 border border-amber-500/30 rounded-[4rem] p-16 text-center space-y-10 shadow-[0_0_100px_rgba(245,158,11,0.1)]">
+              <div className="w-24 h-24 bg-amber-600 rounded-[2.5rem] mx-auto flex items-center justify-center text-black text-4xl font-black shadow-2xl">!</div>
+              <div className="space-y-4">
+                 <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter">Authorize Autonomous Dispatch?</h2>
+                 <p className="text-slate-400 text-sm leading-relaxed font-bold uppercase tracking-widest">
+                    You are about to commit <span className="text-amber-500">{selectedIds.size} companies</span> to the UHF Autonomous Bridge. This will simulate high-velocity job applications.
+                 </p>
+              </div>
+              <div className="flex flex-col gap-4">
+                 <button 
+                  onClick={handleMassQueue} 
+                  className="w-full py-8 bg-white text-black rounded-[2.5rem] font-black uppercase text-xs tracking-[0.5em] hover:bg-amber-600 hover:text-white transition-all shadow-2xl"
+                 >
+                    Confirm UHF Execution
+                 </button>
+                 <button 
+                  onClick={() => setShowConfirmation(false)} 
+                  className="w-full py-8 border border-white/10 text-slate-500 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.5em] hover:text-white transition-all"
+                 >
+                    Abort Relay
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
