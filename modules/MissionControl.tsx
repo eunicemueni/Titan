@@ -24,15 +24,8 @@ const MissionControl: React.FC<MissionControlProps> = ({
   const [viewingRecord, setViewingRecord] = useState<SentRecord | null>(null);
 
   const handleQueueRelay = async (job: JobRecord) => {
-    onLog(`REDIS: ${targetDailyCap >= 1000 ? 'UHF' : 'PRECISION'} Committed ${job.company} to Autonomous Bridge.`, 'info');
+    onLog(`REDIS: Committed ${job.company} to Autonomous Bridge.`, 'info');
     setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'queued' } : j));
-  };
-
-  const handleGlobalMassDispatch = async () => {
-    const discoverable = jobs.filter(j => j.status === 'discovered');
-    if (discoverable.length === 0) return;
-    onLog(`MASS_RELAY: DISPATCHED to Redis Buffer.`, 'success');
-    setJobs(prev => prev.map(j => j.status === 'discovered' ? { ...j, status: 'queued' } : j));
   };
 
   const queuedJobs = jobs.filter(j => j.status === 'queued');
@@ -111,7 +104,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
                     <td className="py-6 text-[8px] font-black text-indigo-400 uppercase">{record.type}</td>
                     <td className="py-6 text-[11px] font-black text-white uppercase">{record.recipient}</td>
                     <td className="py-6 text-right">
-                      <button onClick={() => setViewingRecord(record)} className="px-6 py-2 bg-slate-900 border border-white/5 rounded-full text-[8px] font-black uppercase text-slate-400">View Payload</button>
+                      <button onClick={() => setViewingRecord(record)} className="px-6 py-2 bg-slate-900 border border-white/5 rounded-full text-[8px] font-black uppercase text-slate-400 hover:text-white">View Payload</button>
                     </td>
                   </tr>
                 ))}

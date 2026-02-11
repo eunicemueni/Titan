@@ -86,7 +86,6 @@ const App: React.FC = () => {
       id: `sent-${Date.now()}`, 
       timestamp: Date.now(), 
       status: 'DISPATCHED',
-      // Ensure the text content is captured for the ledger view
       payload: record.body || record.pitch || record.emailBody || "" 
     };
     setSentRecords(prev => [newRecord, ...prev]);
@@ -102,22 +101,8 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const cloudJobs = await supabaseService.loadJobs();
-        const cloudSent = await supabaseService.loadSentRecords();
-        if (cloudJobs) setJobs(cloudJobs);
-        if (cloudSent) setSentRecords(cloudSent);
-      } catch (e) { addLog("LOCAL_SYNC: Active.", "info"); }
-    };
-    loadData();
-  }, [addLog]);
-
-  // AUTOPILOT ENGINE: Handles both Job Discovery and Gig Pulsing
-  useEffect(() => {
     if (!isAutopilotActive) return;
     
-    // Mission 1: Main Job Scanning
     const executeJobScan = async () => {
       const isUSA = activeProfile.fullName.includes('Ayana');
       const loc = isUSA ? 'USA 100% Remote-Only' : 'Worldwide Remote Distributed';
@@ -135,7 +120,6 @@ const App: React.FC = () => {
       } catch (e) { addLog("Scan Node bypassed.", "warning"); }
     };
 
-    // Mission 2: Flash Gig Pulsing (The "Auto" part of Flash Jobs)
     const executeGigPulse = async () => {
       addLog("AUTOPILOT: Background Gig Pulse initiating...", 'info');
       try {
@@ -143,7 +127,6 @@ const App: React.FC = () => {
         if (Array.isArray(discoveredGigs)) {
           setFlashGigs(prev => {
             const combined = [...discoveredGigs, ...prev];
-            // Unique by title/platform
             return Array.from(new Map(combined.map(item => [item.title + item.platform, item])).values()).slice(0, 50);
           });
           addLog(`AUTOPILOT: Captured ${discoveredGigs.length} new Flash Gigs.`, 'success');
