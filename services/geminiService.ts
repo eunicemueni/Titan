@@ -4,14 +4,18 @@ import { UserProfile } from "../types";
 const cleanJson = (text: string | undefined) => {
   if (!text) return "[]";
   try {
-    // Attempt to extract JSON if model wraps it in Markdown or text
+    // Robust JSON extraction from markdown or text wrapping
     const start = text.indexOf('[');
     const end = text.lastIndexOf(']');
-    if (start !== -1 && end !== -1 && end > start) return text.substring(start, end + 1);
+    if (start !== -1 && end !== -1 && end > start) {
+      return text.substring(start, end + 1);
+    }
     
     const objStart = text.indexOf('{');
     const objEnd = text.lastIndexOf('}');
-    if (objStart !== -1 && objEnd !== -1 && objEnd > objStart) return text.substring(objStart, objEnd + 1);
+    if (objStart !== -1 && objEnd !== -1 && objEnd > objStart) {
+      return text.substring(objStart, objEnd + 1);
+    }
   } catch (e) {
     console.error("TITAN_JSON_CLEAN_ERROR:", e);
   }
@@ -45,22 +49,33 @@ export const geminiService = {
       });
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (base64Audio) {
-        if (!this.audioContext) this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        if (!this.audioContext) {
+          this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        }
+        
         const binaryString = atob(base64Audio);
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
         const dataInt16 = new Int16Array(bytes.buffer);
         const buffer = this.audioContext.createBuffer(1, dataInt16.length, 24000);
         const channelData = buffer.getChannelData(0);
-        for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
+        for (let i = 0; i < dataInt16.length; i++) {
+          channelData[i] = dataInt16[i] / 32768.0;
+        }
+        
         const source = this.audioContext.createBufferSource();
         source.buffer = buffer;
         source.connect(this.audioContext.destination);
         source.start();
         return true;
       }
-    } catch (e) { console.error("TITAN_TTS_FAIL:", e); }
+    } catch (e) {
+      console.error("TITAN_TTS_FAIL:", e);
+    }
     return false;
   },
 
