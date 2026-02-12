@@ -1,5 +1,4 @@
-
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { GoogleGenAI, Type, Modality, LiveServerMessage } from "@google/genai";
 import { UserProfile } from "../types";
 
 const cleanJson = (text: string | undefined) => {
@@ -30,10 +29,51 @@ RULES:
 3. READY-TO-SEND: Every output must be in its final, deployable state.
 4. REMOTE-ONLY: Exclusively target 100% remote/distributed opportunities.`;
 
+// PCM Audio helpers
+function encode(bytes: Uint8Array) {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
 export const geminiService = {
   audioContext: null as AudioContext | null,
+  liveSession: null as any | null,
+  sources: new Set<AudioBufferSourceNode>(),
+  nextStartTime: 0,
 
-  // Use process.env.API_KEY directly as per guidelines
   async speak(text: string) {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -52,14 +92,7 @@ export const geminiService = {
         if (!this.audioContext) {
           this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         }
-        const binaryString = atob(base64Audio);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-        const dataInt16 = new Int16Array(bytes.buffer);
-        const buffer = this.audioContext.createBuffer(1, dataInt16.length, 24000);
-        const channelData = buffer.getChannelData(0);
-        for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
+        const buffer = await decodeAudioData(decode(base64Audio), this.audioContext, 24000, 1);
         const source = this.audioContext.createBufferSource();
         source.buffer = buffer;
         source.connect(this.audioContext.destination);
@@ -70,7 +103,68 @@ export const geminiService = {
     return false;
   },
 
-  // Use process.env.API_KEY directly for model operations
+  async connectLive(onMessage: (text: string) => void, onInterrupted: () => void) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+    
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    this.liveSession = await ai.live.connect({
+      model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+      callbacks: {
+        onopen: () => {
+          const source = inputAudioContext.createMediaStreamSource(stream);
+          const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
+          scriptProcessor.onaudioprocess = (e) => {
+            const inputData = e.inputBuffer.getChannelData(0);
+            const l = inputData.length;
+            const int16 = new Int16Array(l);
+            for (let i = 0; i < l; i++) int16[i] = inputData[i] * 32768;
+            const pcmBlob = {
+              data: encode(new Uint8Array(int16.buffer)),
+              mimeType: 'audio/pcm;rate=16000',
+            };
+            this.liveSession.sendRealtimeInput({ media: pcmBlob });
+          };
+          source.connect(scriptProcessor);
+          scriptProcessor.connect(inputAudioContext.destination);
+        },
+        onmessage: async (message: LiveServerMessage) => {
+          const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+          if (base64Audio) {
+            this.nextStartTime = Math.max(this.nextStartTime, outputAudioContext.currentTime);
+            const buffer = await decodeAudioData(decode(base64Audio), outputAudioContext, 24000, 1);
+            const source = outputAudioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(outputAudioContext.destination);
+            source.start(this.nextStartTime);
+            this.nextStartTime += buffer.duration;
+            this.sources.add(source);
+            source.onended = () => this.sources.delete(source);
+          }
+          if (message.serverContent?.interrupted) {
+            this.sources.forEach(s => s.stop());
+            this.sources.clear();
+            this.nextStartTime = 0;
+            onInterrupted();
+          }
+          if (message.serverContent?.outputTranscription) {
+            onMessage(message.serverContent.outputTranscription.text);
+          }
+        }
+      },
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
+        systemInstruction: SYSTEM_GUIDELINE + "\nYou are currently in a real-time neural link. Provide concise, authoritative status updates and tactical advice.",
+        outputAudioTranscription: {}
+      }
+    });
+
+    return this.liveSession;
+  },
+
   async performUniversalScrape(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -99,7 +193,6 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
-  // Fixed signature to accept strategy and hiringManager to match calls in HiddenHunter.tsx and other modules
   async tailorJobPackage(role: string, company: string, profile: UserProfile, strategy?: string, hiringManager?: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const strategyContext = strategy ? ` Strategy: ${strategy}.` : "";
@@ -125,7 +218,6 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
-  // Use process.env.API_KEY directly for gig discovery
   async scoutFlashGigs(profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -155,7 +247,6 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
-  // Use process.env.API_KEY directly for B2B analysis
   async analyzeOperationalGaps(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -185,7 +276,6 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
-  // Use process.env.API_KEY directly for contact enrichment
   async performDeepEmailScrape(company: string, domain: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -208,7 +298,6 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
-  // Use process.env.API_KEY directly for console command processing
   async processConsoleCommand(command: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -219,7 +308,6 @@ export const geminiService = {
     return response.text || "Command execution failure.";
   },
 
-  // Use process.env.API_KEY directly for nexus lead discovery
   async scoutNexusLeads(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -247,7 +335,6 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
-  // Use process.env.API_KEY directly for email enrichment
   async enrichCompanyEmail(companyName: string, website: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -268,7 +355,6 @@ export const geminiService = {
     return result.email || "Not Found";
   },
 
-  // Use process.env.API_KEY directly for operational audits
   async getOperationalAudit(prompt: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -279,7 +365,6 @@ export const geminiService = {
     return response.text || "Audit failed.";
   },
 
-  // Use process.env.API_KEY directly for B2B pitch generation
   async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -290,7 +375,6 @@ export const geminiService = {
     return response.text || "Pitch failed.";
   },
 
-  // Use process.env.API_KEY directly for Market Nexus proposal synthesis
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -315,7 +399,6 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
-  // Use process.env.API_KEY directly for image generation tasks
   async generateVision(prompt: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -329,7 +412,6 @@ export const geminiService = {
     return null;
   },
 
-  // Use process.env.API_KEY directly for client lead discovery
   async scoutClientLeads(niche: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -358,7 +440,6 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
-  // Use process.env.API_KEY directly for client pitch tailoring
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
