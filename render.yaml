@@ -1,7 +1,7 @@
 services:
   - type: web
     name: titan-os-hub
-    env: docker
+    runtime: docker
     plan: free
     region: oregon
     envVars:
@@ -12,7 +12,7 @@ services:
       - key: API_KEY
         sync: false
       - key: REDIS_URL
-        value: rediss://default:WR4PsdBO788Qyav9olhP50pmO9rLt80e@redis-13106.c17.us-east-1-4.ec2.cloud.redislabs.com:13106
+        sync: false
     healthCheckPath: /api/health
     dockerContext: .
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: Dockerfile
