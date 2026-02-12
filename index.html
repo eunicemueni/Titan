@@ -59,8 +59,6 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #30363d;
         }
-
-        /* Scanline Overlay */
         .scanline::before {
             content: " ";
             display: block;
@@ -72,7 +70,6 @@
             pointer-events: none;
             opacity: 0.15;
         }
-
         @keyframes pulse-ring {
           0% { transform: scale(0.8); opacity: 0.5; }
           50% { transform: scale(1.1); opacity: 0.3; }
@@ -81,24 +78,16 @@
         .ring-animate {
           animation: pulse-ring 3s infinite ease-in-out;
         }
-        
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.4/",
     "react": "https://esm.sh/react@^19.2.4",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
     "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
     "recharts": "https://esm.sh/recharts@^3.7.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.95.3",
+    "react/": "https://esm.sh/react@^19.2.4/",
     "express": "https://esm.sh/express@^5.2.1",
     "http": "https://esm.sh/http@^0.0.1-security",
     "ws": "https://esm.sh/ws@^8.19.0",
@@ -107,6 +96,7 @@
     "url": "https://esm.sh/url@^0.11.4",
     "bullmq": "https://esm.sh/bullmq@^5.68.0",
     "ioredis": "https://esm.sh/ioredis@^5.9.2",
+    "puppeteer-core": "https://esm.sh/puppeteer-core@^24.37.2",
     "vite": "https://esm.sh/vite@^7.3.1",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4"
   }
