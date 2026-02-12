@@ -1,5 +1,7 @@
 {
   "name": "TITAN OS",
   "description": "Professional suite for career management and automated discovery efficiency.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }
