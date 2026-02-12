@@ -1,3 +1,4 @@
+
 import express from 'express';
 import http from 'http';
 import { WebSocketServer } from 'ws';
@@ -14,45 +15,37 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// TITAN_OS CLOUD NODE UPLINK
-const REDIS_URL = process.env.REDIS_URL || "rediss://default:WR4PsdBO788Qyav9olhP50pmO9rLt80e@redis-13106.c17.us-east-1-4.ec2.cloud.redislabs.com:13106";
+const PORT = process.env.PORT || 3001;
+const REDIS_URL = process.env.REDIS_URL;
 
-const redisOptions = {
-  maxRetriesPerRequest: null,
-  connectTimeout: 30000,
-  reconnectOnError: (err) => {
-    return true;
-  }
-};
-
-if (REDIS_URL.startsWith('rediss://')) {
-  redisOptions.tls = { rejectUnauthorized: false };
-}
-
-let redisConnection;
+let redisConnection = null;
 let relayQueue = null;
 
-try {
-  redisConnection = new IORedis(REDIS_URL, redisOptions);
-  redisConnection.on('error', (err) => console.error('TITAN_REDIS_ERROR:', err.message));
-  redisConnection.on('connect', () => {
-    console.log('TITAN_HUB_UPLINK: Redis Node Synchronized.');
+// Graceful Redis Initialization
+if (REDIS_URL) {
+  try {
+    const redisOptions = {
+      maxRetriesPerRequest: null,
+      connectTimeout: 15000,
+      tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined
+    };
+    redisConnection = new IORedis(REDIS_URL, redisOptions);
+    redisConnection.on('error', (err) => console.warn('TITAN_REDIS_WAITING:', err.message));
+    
     relayQueue = new Queue('RelayQueue', { connection: redisConnection });
     
-    const worker = new Worker('RelayQueue', async job => {
+    new Worker('RelayQueue', async job => {
       console.log(`[AUTONOMOUS] Dispatching mission to: ${job.data.recipient}`);
-      await new Promise(res => setTimeout(res, 4000)); 
       return { status: 'SUCCESS' };
     }, { connection: redisConnection });
     
-    worker.on('completed', job => {
-      broadcast({ type: 'log', message: `UPLINK_SUCCESS: Relay at ${job.data.recipient} confirmed.`, level: 'success' });
-    });
-  });
-} catch (e) {
-  console.error('TITAN_CRITICAL_INIT_ERROR:', e.message);
+    console.log('TITAN_CORE: Mission Buffer Synchronized.');
+  } catch (e) {
+    console.error('REDIS_LINK_FAILED:', e.message);
+  }
 }
 
+// Serve static files from the 'dist' directory
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 
@@ -62,17 +55,12 @@ const wss = new WebSocketServer({ server });
 let clients = [];
 wss.on('connection', (ws) => {
   clients.push(ws);
-  ws.send(JSON.stringify({ type: 'log', message: 'TITAN_NEURAL: Uplink established with Server Hub.', level: 'info' }));
+  ws.send(JSON.stringify({ type: 'log', message: 'TITAN_NEURAL: Uplink established.', level: 'info' }));
   ws.on('close', () => { clients = clients.filter(c => c !== ws); });
 });
 
-const broadcast = (data) => {
-  const payload = JSON.stringify(data);
-  clients.forEach(ws => { if (ws.readyState === 1) ws.send(payload); });
-};
-
 app.post('/api/dispatch', async (req, res) => {
-  if (!relayQueue) return res.status(503).json({ error: 'Hub Database Offline' });
+  if (!relayQueue) return res.status(503).json({ error: 'Background Queue Unavailable' });
   const { recipient, subject, body, type } = req.body;
   try {
     const job = await relayQueue.add('dispatch-job', { recipient, subject, body, type });
@@ -82,42 +70,22 @@ app.post('/api/dispatch', async (req, res) => {
   }
 });
 
-app.get('/api/health', async (req, res) => {
-  try {
-    const redisStatus = redisConnection ? redisConnection.status : 'disconnected';
-    const waitingCount = relayQueue ? await relayQueue.getWaitingCount() : 0;
-    res.json({
-      status: 'UP',
-      redis: redisStatus,
-      queue: { waiting: waitingCount },
-      uptime: process.uptime(),
-      node: 'TITAN_SERVER_CENTRAL'
-    });
-  } catch (e) { 
-    res.status(500).json({ status: 'DOWN', error: e.message }); 
-  }
+// CRITICAL FOR RENDER: Rapid Health Check
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'ACTIVE',
+    redis: redisConnection ? redisConnection.status : 'offline',
+    uptime: process.uptime(),
+    node: 'TITAN_CORE_PRIMARY'
+  });
 });
 
-setInterval(async () => {
-  if (!relayQueue) return;
-  try {
-    const [waiting, active, completed, failed] = await Promise.all([
-      relayQueue.getWaitingCount(),
-      relayQueue.getActiveCount(),
-      relayQueue.getCompletedCount(),
-      relayQueue.getFailedCount(),
-    ]);
-    broadcast({ type: 'queue_stats', stats: { waiting, active, completed, failed } });
-  } catch (e) {}
-}, 5000);
-
+// Fallback for SPA routing: handle all other requests by serving index.html
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api')) return;
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-// CRITICAL: Production hosts require binding to 0.0.0.0 and PORT env
-const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`TITAN_SERVER_HUB: Running on 0.0.0.0:${PORT}`);
+  console.log(`TITAN_OS: System listening on port ${PORT}`);
 });

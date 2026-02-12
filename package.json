@@ -1,3 +1,4 @@
+
 {
   "name": "titan-os-command-ai",
   "version": "7.0.0",
@@ -20,6 +21,7 @@
     "recharts": "^2.10.0",
     "bullmq": "^5.68.0",
     "ioredis": "^5.4.1",
+    "puppeteer-core": "^22.0.0",
     "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
