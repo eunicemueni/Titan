@@ -194,54 +194,14 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
-  async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `TASK: Generate a $${service.price} high-stakes corporate proposal for ${lead.name} for "${service.name}". Lead context: ${lead.hiringContext}.`,
-      config: {
-        systemInstruction: SYSTEM_GUIDELINE,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            subject: { type: Type.STRING },
-            executiveSummary: { type: Type.STRING },
-            implementationPhases: { type: Type.STRING },
-            valueProjection: { type: Type.STRING },
-            emailBody: { type: Type.STRING }
-          },
-          required: ["subject", "executiveSummary", "implementationPhases", "valueProjection", "emailBody"]
-        }
-      }
-    });
-    return JSON.parse(cleanJson(response.text));
-  },
-
-  async enrichCompanyEmail(company: string, website: string) {
-    const domain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace('www.', '');
-    const result = await this.performDeepEmailScrape(company, domain);
-    return result.email === 'Not Found' ? null : result.email;
-  },
-
-  async getOperationalAudit(prompt: string, profile: UserProfile) {
+  async processConsoleCommand(command: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `${prompt}\n\nUser Context: ${profile.fullName}, ${profile.domain}.`,
+      contents: `${command}\n\nContext: ${profile.fullName}`,
       config: { systemInstruction: SYSTEM_GUIDELINE }
     });
-    return response.text || "Audit generation failed.";
-  },
-
-  async generateB2BPitch(company: string, gaps: string[], solution: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `Draft a high-velocity B2B pitch for ${company}. Gaps: ${gaps.join(', ')}. Solution: ${solution}. Lead: ${profile.fullName}.`,
-      config: { systemInstruction: SYSTEM_GUIDELINE }
-    });
-    return response.text || "Pitch synthesis failed.";
+    return response.text || "Command execution failure.";
   },
 
   async scoutNexusLeads(industry: string, location: string) {
@@ -271,6 +231,77 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
+  // Fix: Added missing method enrichCompanyEmail for B2B revenue workflows
+  async enrichCompanyEmail(companyName: string, website: string) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Identify the primary business or executive contact email for ${companyName} (${website}). Return as JSON.`,
+      config: {
+        systemInstruction: SYSTEM_GUIDELINE,
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            email: { type: Type.STRING }
+          },
+          required: ["email"]
+        }
+      }
+    });
+    const result = JSON.parse(cleanJson(response.text));
+    return result.email || "Not Found";
+  },
+
+  // Fix: Added missing method getOperationalAudit for B2B gap analysis
+  async getOperationalAudit(prompt: string, profile: UserProfile) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: `${prompt}\n\nAnalyst Identity: ${profile.fullName}\nExpertise: ${profile.masterCV}`,
+      config: { systemInstruction: SYSTEM_GUIDELINE }
+    });
+    return response.text;
+  },
+
+  // Fix: Added missing method generateB2BPitch for RevenueHubs module
+  async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: `Generate a high-authority B2B pitch for ${companyName}.\nLogic Gaps: ${gaps.join(', ')}\nSolution: ${solution}\nSender DNA: ${profile.masterCV}`,
+      config: { systemInstruction: SYSTEM_GUIDELINE }
+    });
+    return response.text;
+  },
+
+  // Fix: Added missing method generateMarketNexusPitch for MarketNexus module
+  async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: `Synthesize a formal Market Nexus proposal for ${lead.name} regarding the ${service.name} asset.\nContext: ${lead.hiringContext}\nProvider: ${profile.fullName}`,
+      config: {
+        systemInstruction: SYSTEM_GUIDELINE,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            subject: { type: Type.STRING },
+            executiveSummary: { type: Type.STRING },
+            implementationPhases: { type: Type.STRING },
+            valueProjection: { type: Type.STRING },
+            emailBody: { type: Type.STRING }
+          },
+          required: ["subject", "executiveSummary", "implementationPhases", "valueProjection", "emailBody"]
+        }
+      }
+    });
+    return JSON.parse(cleanJson(response.text));
+  },
+
+  // Fix: Added missing method generateVision for MarketNexus blueprint rendering
   async generateVision(prompt: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
@@ -288,21 +319,12 @@ export const geminiService = {
     return null;
   },
 
-  async processConsoleCommand(command: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `${command}\n\nContext: ${profile.fullName}`,
-      config: { systemInstruction: SYSTEM_GUIDELINE }
-    });
-    return response.text || "Command execution failure.";
-  },
-
+  // Fix: Added missing method scoutClientLeads for ClientNexus module
   async scoutClientLeads(niche: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Identify 6 client leads for niche "${niche}" based on profile ${profile.domain}. Return JSON.`,
+      contents: `Find 10 corporate client leads (publications, agencies) in niche: "${niche}". User Context: ${profile.masterCV}`,
       config: {
         systemInstruction: SYSTEM_GUIDELINE,
         tools: [{ googleSearch: {} }],
@@ -316,8 +338,7 @@ export const geminiService = {
               website: { type: Type.STRING },
               description: { type: Type.STRING },
               type: { type: Type.STRING, enum: ["PUBLICATION", "AGENCY", "OTHER"] },
-              opportunityScore: { type: Type.NUMBER },
-              email: { type: Type.STRING }
+              opportunityScore: { type: Type.NUMBER }
             },
             required: ["companyName", "website", "description", "type", "opportunityScore"]
           }
@@ -327,11 +348,12 @@ export const geminiService = {
     return JSON.parse(cleanJson(response.text));
   },
 
-  async tailorClientPitch(company: string, description: string, profile: UserProfile) {
+  // Fix: Added missing method tailorClientPitch for ClientNexus module
+  async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Synthesize a client pitch for ${company}. Description: ${description}. Lead: ${profile.fullName}. Return JSON.`,
+      contents: `Tailor a high-stakes corporate pitch for ${companyName}.\nOpportunity: ${description}\nExpertise: ${profile.masterCV}`,
       config: {
         systemInstruction: SYSTEM_GUIDELINE,
         responseMimeType: "application/json",
@@ -342,7 +364,7 @@ export const geminiService = {
             body: { type: Type.STRING },
             contactPersonStrategy: { type: Type.STRING }
           },
-          required: ["subject", "body"]
+          required: ["subject", "body", "contactPersonStrategy"]
         }
       }
     });

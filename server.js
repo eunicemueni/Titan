@@ -1,10 +1,14 @@
-const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
-const cors = require('cors');
-const path = require('path');
-const { Queue } = require('bullmq');
-const IORedis = require('ioredis');
+import express from 'express';
+import http from 'http';
+import { WebSocketServer } from 'ws';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { Queue } from 'bullmq';
+import IORedis from 'ioredis';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
@@ -27,21 +31,24 @@ if (REDIS_URL.startsWith('rediss://')) {
 }
 
 let redisConnection;
+let relayQueue = null;
+
 try {
   redisConnection = new IORedis(REDIS_URL, redisOptions);
   redisConnection.on('error', (err) => console.error('TITAN_REDIS_ERROR:', err.message));
-  redisConnection.on('connect', () => console.log('TITAN_UPLINK_STABLE: Node database-MLIN3KYX synchronized.'));
+  redisConnection.on('connect', () => {
+    console.log('TITAN_UPLINK_STABLE: Node database-MLIN3KYX synchronized.');
+    relayQueue = new Queue('RelayQueue', { connection: redisConnection });
+  });
 } catch (e) {
   console.error('TITAN_REDIS_INIT_CRITICAL_FAIL:', e.message);
 }
-
-const relayQueue = redisConnection ? new Queue('RelayQueue', { connection: redisConnection }) : null;
 
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocketServer({ server });
 
 let clients = [];
 wss.on('connection', (ws) => {
@@ -52,13 +59,13 @@ wss.on('connection', (ws) => {
 
 const broadcast = (data) => {
   const payload = JSON.stringify(data);
-  clients.forEach(ws => { if (ws.readyState === WebSocket.OPEN) ws.send(payload); });
+  clients.forEach(ws => { if (ws.readyState === 1) ws.send(payload); });
 };
 
 app.get('/api/health', async (req, res) => {
   try {
     const redisStatus = redisConnection ? redisConnection.status : 'disconnected';
-    const waitingCount = (redisConnection && relayQueue) ? await relayQueue.getWaitingCount() : 0;
+    const waitingCount = relayQueue ? await relayQueue.getWaitingCount() : 0;
     res.json({
       status: 'UP',
       redis: redisStatus,
@@ -66,11 +73,13 @@ app.get('/api/health', async (req, res) => {
       uptime: process.uptime(),
       node: 'database-MLIN3KYX'
     });
-  } catch (e) { res.status(500).json({ status: 'DOWN', error: e.message }); }
+  } catch (e) { 
+    res.status(500).json({ status: 'DOWN', error: e.message }); 
+  }
 });
 
 setInterval(async () => {
-  if (!redisConnection || redisConnection.status !== 'ready' || !relayQueue) return;
+  if (!relayQueue) return;
   try {
     const [waiting, active, completed, failed] = await Promise.all([
       relayQueue.getWaitingCount(),
@@ -92,6 +101,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n==========================================`);
   console.log(`TITAN OS COMMAND HUB: ONLINE`);
   console.log(`PORT: ${PORT}`);
-  console.log(`NODE: database-MLIN3KYX`);
+  console.log(`STATUS: READY`);
   console.log(`==========================================\n`);
 });

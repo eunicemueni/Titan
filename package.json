@@ -1,8 +1,9 @@
 {
   "name": "titan-os-command-ai",
-  "version": "6.5.0",
-  "description": "Autonomous Career & Business Operating System - Enterprise Scale",
+  "version": "7.0.0",
+  "description": "Autonomous Career & Business Operating System",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -14,12 +15,12 @@
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "ws": "^8.13.0",
-    "puppeteer": "^21.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.10.0",
     "bullmq": "^5.0.0",
-    "ioredis": "^5.3.2"
+    "ioredis": "^5.3.2",
+    "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

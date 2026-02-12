@@ -9,6 +9,7 @@ export default defineConfig({
     'process.env.OXYLABS_PASS': JSON.stringify('cV4sOJ=BSGFe1im'),
     'process.env.REDIS_URL': JSON.stringify('rediss://default:WR4PsdBO788Qyav9olhP50pmO9rLt80e@redis-13106.c17.us-east-1-4.ec2.cloud.redislabs.com:13106'),
     'process.env.NODE_ENV': JSON.stringify('production'),
+    'process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD': JSON.stringify('true'),
   },
   build: {
     outDir: 'dist',
