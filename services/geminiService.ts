@@ -62,7 +62,6 @@ export const geminiService = {
     try {
       return JSON.parse(response.text || "[]");
     } catch (e) {
-      console.error("JSON_PARSE_ERR", e);
       return [];
     }
   },
@@ -346,7 +345,8 @@ export const geminiService = {
     const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    this.sessionPromise = ai.live.connect({
+    const self = geminiService;
+    self.sessionPromise = ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-12-2025',
       callbacks: {
         onopen: () => {
@@ -356,7 +356,7 @@ export const geminiService = {
             const inputData = e.inputBuffer.getChannelData(0);
             const int16 = new Int16Array(inputData.length);
             for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
-            this.sessionPromise?.then((session) => {
+            self.sessionPromise?.then((session) => {
                session.sendRealtimeInput({ media: { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' } });
             });
           };
@@ -366,13 +366,13 @@ export const geminiService = {
         onmessage: async (msg) => {
           const audio = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
           if (audio) {
-            this.nextStartTime = Math.max(this.nextStartTime, outputCtx.currentTime);
+            self.nextStartTime = Math.max(self.nextStartTime, outputCtx.currentTime);
             const buffer = await decodeAudioData(decode(audio), outputCtx, 24000);
             const source = outputCtx.createBufferSource();
             source.buffer = buffer;
             source.connect(outputCtx.destination);
-            source.start(this.nextStartTime);
-            this.nextStartTime += buffer.duration;
+            source.start(self.nextStartTime);
+            self.nextStartTime += buffer.duration;
           }
           if (msg.serverContent?.interrupted) onInterrupted();
           if (msg.serverContent?.outputTranscription) onMessage(msg.serverContent.outputTranscription.text);
@@ -381,11 +381,12 @@ export const geminiService = {
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
-        systemInstruction: SYSTEM_INSTRUCTION + "\nLive link. Be brief.",
-        outputAudioTranscription: {}
+        systemInstruction: SYSTEM_INSTRUCTION + "\nLive link active. Be concise and authoritative.",
+        outputAudioTranscription: {},
+        inputAudioTranscription: {}
       }
     });
-    this.liveSession = await this.sessionPromise;
+    self.liveSession = await self.sessionPromise;
   },
 
   async processConsoleCommand(command: string, profile: UserProfile) {

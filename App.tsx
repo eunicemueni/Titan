@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord, AppAnalytics, QueueStatus } from './types';
 import Dashboard from './modules/Dashboard';
 import MissionControl from './modules/MissionControl';
@@ -18,6 +18,21 @@ import MobileNav from './components/MobileNav';
 import GlobalSearchModal from './components/GlobalSearchModal';
 import { INITIAL_TELEMETRY } from './constants';
 
+const PROFILES: UserProfile[] = [
+  {
+    fullName: "Eunice Muema",
+    email: "eunice.muema@titannodes.ai",
+    domain: "Actuarial & Risk Proxy",
+    themeColor: "indigo",
+    portfolioUrl: "https://eunicemuema.pro",
+    linkedinUrl: "linkedin.com/in/eunice-muema",
+    masterCV: "Strategic Actuarial Lead with 10+ years in risk modeling and stochastic analysis.",
+    expertiseBlocks: { "ACTUARIAL": "Deep stochastic modeling, risk mitigation, and liability auditing." },
+    preferences: { minSalary: "180k", targetRoles: ["Actuarial Director"], remoteOnly: true },
+    stats: { coldEmailsSent: 142, leadsGenerated: 24, salesClosed: 4, totalRevenue: 15600 }
+  }
+];
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
@@ -27,6 +42,7 @@ const App: React.FC = () => {
   const [hubOnline, setHubOnline] = useState<boolean | null>(null);
   
   const [activeIndex, setActiveIndex] = useState(0);
+  const [profiles, setProfiles] = useState<UserProfile[]>(PROFILES);
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [sentRecords, setSentRecords] = useState<SentRecord[]>([]);
   const [logs, setLogs] = useState<TelemetryLog[]>(INITIAL_TELEMETRY);
@@ -34,22 +50,7 @@ const App: React.FC = () => {
   const [targetDailyCap, setTargetDailyCap] = useState(150);
   const [autoGigs, setAutoGigs] = useState<any[]>([]);
 
-  const profiles: UserProfile[] = [
-    {
-      fullName: "Eunice Muema",
-      email: "eunice.muema@titannodes.ai",
-      domain: "Actuarial & Risk Proxy",
-      themeColor: "indigo",
-      portfolioUrl: "https://eunicemuema.pro",
-      linkedinUrl: "linkedin.com/in/eunice-muema",
-      masterCV: "Strategic Actuarial Lead with 10+ years in risk modeling and stochastic analysis.",
-      expertiseBlocks: { "ACTUARIAL": "Deep stochastic modeling, risk mitigation, and liability auditing." },
-      preferences: { minSalary: "180k", targetRoles: ["Actuarial Director"], remoteOnly: true },
-      stats: { coldEmailsSent: 142, leadsGenerated: 24, salesClosed: 4, totalRevenue: 15600 }
-    }
-  ];
-
-  const currentProfile = profiles[activeIndex];
+  const currentProfile = useMemo(() => profiles[activeIndex] || profiles[0], [profiles, activeIndex]);
 
   const addLog = useCallback((message: string, level: TelemetryLog['level'] = 'info') => {
     const newLog: TelemetryLog = { id: Date.now().toString(), message, level, timestamp: Date.now() };
@@ -73,7 +74,7 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
-  const handleSentRecord = (record: Omit<SentRecord, 'id' | 'timestamp' | 'status'>) => {
+  const handleSentRecord = useCallback((record: Omit<SentRecord, 'id' | 'timestamp' | 'status'>) => {
     const newRecord: SentRecord = {
       ...record,
       id: `sent-${Date.now()}`,
@@ -81,7 +82,7 @@ const App: React.FC = () => {
       status: 'DISPATCHED'
     };
     setSentRecords(prev => [newRecord, ...prev]);
-  };
+  }, []);
 
   const renderView = () => {
     const commonProps = {
@@ -94,7 +95,19 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case AppView.MISSION_CONTROL:
-        return <MissionControl {...commonProps} jobs={jobs} setJobs={setJobs} isAutopilot={isAutopilotActive} onToggleAutopilot={() => setIsAutopilotActive(!isAutopilotActive)} sentRecords={sentRecords} queueStatus={{waiting: 0, active: 0, completed: 0, failed: 0}} evasionStatus="STEALTH" missions={[]} />;
+        return (
+          <MissionControl 
+            {...commonProps} 
+            jobs={jobs} 
+            setJobs={setJobs} 
+            isAutopilot={isAutopilotActive} 
+            onToggleAutopilot={() => setIsAutopilotActive(!isAutopilotActive)} 
+            sentRecords={sentRecords} 
+            queueStatus={{waiting: 0, active: 0, completed: 0, failed: 0}} 
+            evasionStatus="STEALTH" 
+            missions={[]} 
+          />
+        );
       case AppView.JOB_SCANNER:
         return <ScraperNode {...commonProps} setJobs={setJobs} jobs={jobs} updateStats={() => {}} bridgeStatus={hubOnline ? 'ONLINE' : 'OFFLINE'} onReconnect={() => {}} />;
       case AppView.OUTREACH:
@@ -106,7 +119,20 @@ const App: React.FC = () => {
       case AppView.MARKET_NEXUS:
         return <MarketNexus {...commonProps} updateStats={() => {}} />;
       case AppView.PROFILE:
-        return <IdentityVault profiles={profiles} setProfiles={() => {}} activeIndex={activeIndex} setActiveIndex={setActiveIndex} onLog={addLog} onTrack={() => {}} sentRecords={sentRecords} setSentRecords={() => {}} analytics={{agentDetections: 0, customCVsGenerated: 0, totalIncome: 0, lastPulse: 0, activeLeads: 0}} setAnalytics={() => {}} />;
+        return (
+          <IdentityVault 
+            profiles={profiles} 
+            setProfiles={setProfiles} 
+            activeIndex={activeIndex} 
+            setActiveIndex={setActiveIndex} 
+            onLog={addLog} 
+            onTrack={() => {}} 
+            sentRecords={sentRecords} 
+            setSentRecords={setSentRecords} 
+            analytics={{agentDetections: 0, customCVsGenerated: 0, totalIncome: 0, lastPulse: 0, activeLeads: 0}} 
+            setAnalytics={() => {}} 
+          />
+        );
       case AppView.VAULT_SYNC:
         return <SystemDeploy onLog={addLog} bridgeStatus={hubOnline ? 'ONLINE' : 'OFFLINE'} onReconnect={() => {}} />;
       default:
