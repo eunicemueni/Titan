@@ -25,7 +25,7 @@ if (REDIS_URL) {
   try {
     const redisOptions = {
       maxRetriesPerRequest: null,
-      connectTimeout: 10000,
+      connectTimeout: 15000,
       tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined
     };
     redisConnection = new IORedis(REDIS_URL, redisOptions);
@@ -34,14 +34,14 @@ if (REDIS_URL) {
     relayQueue = new Queue('RelayQueue', { connection: redisConnection });
     
     new Worker('RelayQueue', async job => {
-      console.log(`[AUTONOMOUS] Dispatching mission to: ${job.data.recipient}`);
-      // In a real environment, this is where Puppeteer would launch
+      console.log(`[AUTONOMOUS_MISSION] Executing dispatch for: ${job.data.recipient}`);
+      // Future Expansion: Puppeteer instance logic here
       return { status: 'SUCCESS' };
     }, { connection: redisConnection });
     
     console.log('TITAN_CORE: Mission Buffer Synchronized.');
   } catch (e) {
-    console.error('REDIS_LINK_FAILED:', e.message);
+    console.error('TITAN_REDIS_ERROR:', e.message);
   }
 }
 
@@ -70,11 +70,15 @@ app.post('/api/dispatch', async (req, res) => {
   }
 });
 
-// CRITICAL FOR RENDER: Rapid Health Check
-// MUST return 200 for Render to mark the deployment as successful
+/**
+ * CRITICAL FOR RENDER: Rapid Health Check
+ * Returning 200 OK signals Render that the container is healthy and ready to serve traffic.
+ */
 app.get('/api/health', (req, res) => {
   res.status(200).json({
-    status: 'ACTIVE'
+    status: 'ACTIVE',
+    timestamp: new Date().toISOString(),
+    node: 'TITAN_CORE_PRIMARY'
   });
 });
 
@@ -85,5 +89,6 @@ app.get('*', (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`TITAN_OS: System listening on port ${PORT}`);
+  console.log(`TITAN_OS: System online and listening on port ${PORT}`);
+  console.log(`TITAN_OS: Serving production assets from ${distPath}`);
 });
