@@ -24,6 +24,8 @@ const MissionControl: React.FC<MissionControlProps> = ({
   const [useBridgeRelay, setUseBridgeRelay] = useState(true);
 
   const handleQueueRelay = async (job: JobRecord) => {
+    const payloadContent = `Application via TITAN OS Relay. Target: ${job.role} at ${job.company}. Source Context: ${profile.masterCV.slice(0, 100)}...`;
+
     if (useBridgeRelay) {
       onLog(`BRIDGE: Committing ${job.company} to background dispatch...`, 'info');
       try {
@@ -33,7 +35,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
           body: JSON.stringify({
             recipient: job.company,
             subject: `Strategic Application: ${job.role} - ${profile.fullName}`,
-            body: `Applied via TITAN OS Bridge Relay. Payload: ${profile.masterCV.slice(0, 100)}...`,
+            body: payloadContent,
             type: 'JOB_APPLICATION'
           })
         });
@@ -55,8 +57,14 @@ const MissionControl: React.FC<MissionControlProps> = ({
       }
     } else {
       onLog(`MANUAL: Opening local relay for ${job.company}...`, 'info');
-      window.open(`mailto:?subject=Application for ${job.role}&body=${encodeURIComponent(profile.masterCV.slice(0, 200))}`);
+      window.open(`mailto:?subject=Application for ${job.role}&body=${encodeURIComponent(payloadContent)}`);
       setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'queued' } : j));
+      onSent({ 
+        type: 'JOB_APPLICATION', 
+        recipient: job.company, 
+        subject: `Strategic Application: ${job.role}`,
+        payload: payloadContent
+      });
     }
   };
 

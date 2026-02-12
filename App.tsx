@@ -101,6 +101,8 @@ const App: React.FC = () => {
         return <HiddenHunter {...commonProps} updateStats={() => {}} companies={[]} setCompanies={() => {}} evasionStatus="STEALTH" />;
       case AppView.INCOME_GIGS:
         return <GigFlash {...commonProps} autoGigs={autoGigs} setAutoGigs={setAutoGigs} isAutopilot={isAutopilotActive} />;
+      case AppView.INCOME_B2B:
+        return <RevenueHubs {...commonProps} updateStats={() => {}} />;
       case AppView.MARKET_NEXUS:
         return <MarketNexus {...commonProps} updateStats={() => {}} />;
       case AppView.PROFILE:
