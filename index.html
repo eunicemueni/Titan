@@ -56,15 +56,12 @@
             background: #21262d;
             border-radius: 10px;
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #30363d;
-        }
         .scanline::before {
             content: " ";
             display: block;
             position: absolute;
             top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
             z-index: 9999;
             background-size: 100% 2px, 3px 100%;
             pointer-events: none;
@@ -72,7 +69,7 @@
         }
         @keyframes pulse-ring {
           0% { transform: scale(0.8); opacity: 0.5; }
-          50% { transform: scale(1.1); opacity: 0.3; }
+          50% { transform: scale(1.1); opacity: 0.2; }
           100% { transform: scale(0.8); opacity: 0.5; }
         }
         .ring-animate {

@@ -44,7 +44,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
              type: 'JOB_APPLICATION', 
              recipient: job.company, 
              subject: `Strategic Application: ${job.role}`,
-             body: "Transmitted via Server-Side Bridge. Background processing initiated."
+             payload: "Transmitted via Server-Side Bridge. Background processing initiated."
            });
         } else {
            throw new Error("Relay Reject");
@@ -211,11 +211,11 @@ const MissionControl: React.FC<MissionControlProps> = ({
               </div>
               <div className="flex-1 overflow-y-auto p-10 md:p-20 space-y-12 md:space-y-16 custom-scrollbar bg-slate-50">
                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] ml-2">Protocol Header</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Protocol Header</label>
                     <div className="text-xl md:text-3xl font-black text-slate-900 border-l-6 border-indigo-600 pl-8 italic tracking-tighter">{viewingRecord.subject}</div>
                  </div>
                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] ml-2">Transmitted Payload</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Transmitted Payload</label>
                     <div className="text-sm md:text-lg font-serif italic text-slate-700 leading-relaxed bg-white p-10 md:p-16 rounded-[3rem] border border-slate-200 shadow-xl whitespace-pre-wrap relative">
                        <div className="absolute top-6 right-8 text-[8px] font-black text-slate-200 uppercase tracking-widest pointer-events-none">CONFIDENTIAL_CORE</div>
                        {viewingRecord.payload || "Full operational dossier transmitted via autonomous Bridge protocol. No local copy required for stealth compliance."}
