@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord, AppAnalytics, QueueStatus } from './types';
+import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord, AppAnalytics, QueueStatus, TargetedCompany } from './types';
 import Dashboard from './modules/Dashboard';
 import MissionControl from './modules/MissionControl';
 import ScraperNode from './modules/JobAutopilot';
@@ -9,7 +9,6 @@ import IdentityVault from './modules/IdentityVault';
 import SystemDeploy from './modules/SystemDeploy';
 import GigFlash from './modules/GigFlash';
 import MarketNexus from './modules/MarketNexus';
-import ClientNexus from './modules/ClientNexus';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Console from './components/Console';
@@ -33,6 +32,14 @@ const PROFILES: UserProfile[] = [
   }
 ];
 
+const INITIAL_ANALYTICS: AppAnalytics = {
+  agentDetections: 0,
+  customCVsGenerated: 0,
+  totalIncome: 0,
+  lastPulse: Date.now(),
+  activeLeads: 0
+};
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
@@ -49,13 +56,33 @@ const App: React.FC = () => {
   const [isAutopilotActive, setIsAutopilotActive] = useState(false);
   const [targetDailyCap, setTargetDailyCap] = useState(150);
   const [autoGigs, setAutoGigs] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<TargetedCompany[]>([]);
+  const [analytics, setAnalytics] = useState<AppAnalytics>(INITIAL_ANALYTICS);
 
   const currentProfile = useMemo(() => profiles[activeIndex] || profiles[0], [profiles, activeIndex]);
 
   const addLog = useCallback((message: string, level: TelemetryLog['level'] = 'info') => {
-    const newLog: TelemetryLog = { id: Date.now().toString(), message, level, timestamp: Date.now() };
+    const newLog: TelemetryLog = { 
+      id: `log-${Date.now()}-${Math.random()}`, 
+      message, 
+      level, 
+      timestamp: Date.now() 
+    };
     setLogs(prev => [newLog, ...prev].slice(0, 50));
   }, []);
+
+  const updateStats = useCallback((updates: Partial<UserProfile['stats']>) => {
+    setProfiles(prev => {
+      const next = [...prev];
+      if (next[activeIndex]) {
+        next[activeIndex] = {
+          ...next[activeIndex],
+          stats: { ...next[activeIndex].stats, ...updates }
+        };
+      }
+      return next;
+    });
+  }, [activeIndex]);
 
   useEffect(() => {
     const checkHub = async () => {
@@ -77,7 +104,7 @@ const App: React.FC = () => {
   const handleSentRecord = useCallback((record: Omit<SentRecord, 'id' | 'timestamp' | 'status'>) => {
     const newRecord: SentRecord = {
       ...record,
-      id: `sent-${Date.now()}`,
+      id: `sent-${Date.now()}-${Math.random()}`,
       timestamp: Date.now(),
       status: 'DISPATCHED'
     };
@@ -109,15 +136,49 @@ const App: React.FC = () => {
           />
         );
       case AppView.JOB_SCANNER:
-        return <ScraperNode {...commonProps} setJobs={setJobs} jobs={jobs} updateStats={() => {}} bridgeStatus={hubOnline ? 'ONLINE' : 'OFFLINE'} onReconnect={() => {}} />;
+        return (
+          <ScraperNode 
+            {...commonProps} 
+            setJobs={setJobs} 
+            jobs={jobs} 
+            updateStats={updateStats} 
+            bridgeStatus={hubOnline ? 'ONLINE' : 'OFFLINE'} 
+            onReconnect={() => {}} 
+          />
+        );
       case AppView.OUTREACH:
-        return <HiddenHunter {...commonProps} updateStats={() => {}} companies={[]} setCompanies={() => {}} evasionStatus="STEALTH" />;
+        return (
+          <HiddenHunter 
+            {...commonProps} 
+            updateStats={updateStats} 
+            companies={companies} 
+            setCompanies={setCompanies} 
+            evasionStatus="STEALTH" 
+          />
+        );
       case AppView.INCOME_GIGS:
-        return <GigFlash {...commonProps} autoGigs={autoGigs} setAutoGigs={setAutoGigs} isAutopilot={isAutopilotActive} />;
+        return (
+          <GigFlash 
+            {...commonProps} 
+            autoGigs={autoGigs} 
+            setAutoGigs={setAutoGigs} 
+            isAutopilot={isAutopilotActive} 
+          />
+        );
       case AppView.INCOME_B2B:
-        return <RevenueHubs {...commonProps} updateStats={() => {}} />;
+        return (
+          <RevenueHubs 
+            {...commonProps} 
+            updateStats={updateStats} 
+          />
+        );
       case AppView.MARKET_NEXUS:
-        return <MarketNexus {...commonProps} updateStats={() => {}} />;
+        return (
+          <MarketNexus 
+            {...commonProps} 
+            updateStats={updateStats} 
+          />
+        );
       case AppView.PROFILE:
         return (
           <IdentityVault 
@@ -129,14 +190,40 @@ const App: React.FC = () => {
             onTrack={() => {}} 
             sentRecords={sentRecords} 
             setSentRecords={setSentRecords} 
-            analytics={{agentDetections: 0, customCVsGenerated: 0, totalIncome: 0, lastPulse: 0, activeLeads: 0}} 
-            setAnalytics={() => {}} 
+            analytics={analytics} 
+            setAnalytics={setAnalytics} 
           />
         );
       case AppView.VAULT_SYNC:
-        return <SystemDeploy onLog={addLog} bridgeStatus={hubOnline ? 'ONLINE' : 'OFFLINE'} onReconnect={() => {}} />;
+        return (
+          <SystemDeploy 
+            onLog={addLog} 
+            bridgeStatus={hubOnline ? 'ONLINE' : 'OFFLINE'} 
+            onReconnect={() => {}} 
+          />
+        );
       default:
-        return <Dashboard profile={currentProfile} profiles={profiles} activeIndex={activeIndex} onSwitchProfile={setActiveIndex} jobs={jobs} sentRecords={sentRecords} onNavigate={handleNavigate} analytics={{agentDetections: 0, customCVsGenerated: 0, totalIncome: 0, lastPulse: 0, activeLeads: 0}} logs={logs} isAutopilot={isAutopilotActive} onToggleAutopilot={() => setIsAutopilotActive(!isAutopilotActive)} missions={[]} queueStatus={{waiting: 0, active: 0, completed: 0, failed: 0}} targetDailyCap={targetDailyCap} setTargetDailyCap={setTargetDailyCap} evasionStatus="STEALTH" hubOnline={hubOnline} />;
+        return (
+          <Dashboard 
+            profile={currentProfile} 
+            profiles={profiles} 
+            activeIndex={activeIndex} 
+            onSwitchProfile={setActiveIndex} 
+            jobs={jobs} 
+            sentRecords={sentRecords} 
+            onNavigate={handleNavigate} 
+            analytics={analytics} 
+            logs={logs} 
+            isAutopilot={isAutopilotActive} 
+            onToggleAutopilot={() => setIsAutopilotActive(!isAutopilotActive)} 
+            missions={[]} 
+            queueStatus={{waiting: 0, active: 0, completed: 0, failed: 0}} 
+            targetDailyCap={targetDailyCap} 
+            setTargetDailyCap={setTargetDailyCap} 
+            evasionStatus="STEALTH" 
+            hubOnline={hubOnline} 
+          />
+        );
     }
   };
 
@@ -159,9 +246,28 @@ const App: React.FC = () => {
         </main>
         <MobileNav activeView={currentView} onNavigate={handleNavigate} />
       </div>
-      <Console isOpen={consoleOpen} onClose={() => setConsoleOpen(false)} profile={currentProfile} onLog={addLog} autopilot={isAutopilotActive} setAutopilot={setIsAutopilotActive} dailyCap={targetDailyCap} setDailyCap={setTargetDailyCap} setView={setCurrentView} evasionStatus="STEALTH" />
+      <Console 
+        isOpen={consoleOpen} 
+        onClose={() => setConsoleOpen(false)} 
+        profile={currentProfile} 
+        onLog={addLog} 
+        autopilot={isAutopilotActive} 
+        setAutopilot={setIsAutopilotActive} 
+        dailyCap={targetDailyCap} 
+        setDailyCap={setTargetDailyCap} 
+        setView={setCurrentView} 
+        evasionStatus="STEALTH" 
+      />
       <NeuralLink isActive={voiceEnabled} onClose={() => setVoiceEnabled(false)} />
-      <GlobalSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} query={searchQuery} jobs={jobs} sentRecords={sentRecords} profiles={profiles} onNavigate={handleNavigate} />
+      <GlobalSearchModal 
+        isOpen={searchOpen} 
+        onClose={() => setSearchOpen(false)} 
+        query={searchQuery} 
+        jobs={jobs} 
+        sentRecords={sentRecords} 
+        profiles={profiles} 
+        onNavigate={handleNavigate} 
+      />
     </div>
   );
 };

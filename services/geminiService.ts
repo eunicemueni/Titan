@@ -9,22 +9,34 @@ RULES: Use Google Search grounding for recent market data. Return valid JSON whe
 
 function encode(bytes: Uint8Array) {
   let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
   return btoa(binary);
 }
 
 function decode(base64: string) {
   const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
   return bytes;
 }
 
-async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number): Promise<AudioBuffer> {
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number
+): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
   const buffer = ctx.createBuffer(1, dataInt16.length, sampleRate);
   const channelData = buffer.getChannelData(0);
-  for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
+  for (let i = 0; i < dataInt16.length; i++) {
+    channelData[i] = dataInt16[i] / 32768.0;
+  }
   return buffer;
 }
 
@@ -60,7 +72,8 @@ export const geminiService = {
     });
     
     try {
-      return JSON.parse(response.text || "[]");
+      const text = response.text || "[]";
+      return JSON.parse(text);
     } catch (e) {
       return [];
     }
@@ -87,7 +100,8 @@ export const geminiService = {
       }
     });
     try {
-      return JSON.parse(response.text || "{}");
+      const text = response.text || "{}";
+      return JSON.parse(text);
     } catch (e) {
       return {};
     }
@@ -113,7 +127,8 @@ export const geminiService = {
       }
     });
     try {
-      return JSON.parse(response.text || '{"email": "Not Found", "personName": "Decision Maker"}');
+      const text = response.text || '{"email": "Not Found", "personName": "Decision Maker"}';
+      return JSON.parse(text);
     } catch (e) {
       return { email: "Not Found", personName: "Decision Maker" };
     }
@@ -146,7 +161,8 @@ export const geminiService = {
       }
     });
     try {
-      return JSON.parse(response.text || "[]");
+      const text = response.text || "[]";
+      return JSON.parse(text);
     } catch (e) {
       return [];
     }
@@ -164,7 +180,7 @@ export const geminiService = {
       contents: `${prompt}. Context: ${JSON.stringify(profile)}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
     });
-    return response.text;
+    return response.text || "";
   },
 
   async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
@@ -174,7 +190,7 @@ export const geminiService = {
       contents: `Generate a B2B pitch for ${companyName}. Gaps: ${gaps.join(', ')}. Solution: ${solution}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
     });
-    return response.text;
+    return response.text || "";
   },
 
   async scoutNexusLeads(industry: string, location: string) {
@@ -202,7 +218,8 @@ export const geminiService = {
       }
     });
     try {
-      return JSON.parse(response.text || "[]");
+      const text = response.text || "[]";
+      return JSON.parse(text);
     } catch (e) {
       return [];
     }
@@ -230,7 +247,8 @@ export const geminiService = {
       }
     });
     try {
-      return JSON.parse(response.text || "{}");
+      const text = response.text || "{}";
+      return JSON.parse(text);
     } catch (e) {
       return {};
     }
@@ -243,8 +261,11 @@ export const geminiService = {
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+    const candidates = response.candidates || [];
+    if (candidates.length > 0) {
+      for (const part of candidates[0].content.parts) {
+        if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+      }
     }
     return null;
   },
@@ -275,7 +296,8 @@ export const geminiService = {
       }
     });
     try {
-      return JSON.parse(response.text || "[]");
+      const text = response.text || "[]";
+      return JSON.parse(text);
     } catch (e) {
       return [];
     }
@@ -307,7 +329,8 @@ export const geminiService = {
       }
     });
     try {
-      return JSON.parse(response.text || "[]");
+      const text = response.text || "[]";
+      return JSON.parse(text);
     } catch (e) {
       return [];
     }
@@ -333,7 +356,8 @@ export const geminiService = {
       }
     });
     try {
-      return JSON.parse(response.text || "{}");
+      const text = response.text || "{}";
+      return JSON.parse(text);
     } catch (e) {
       return {};
     }
@@ -345,8 +369,7 @@ export const geminiService = {
     const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    const self = geminiService;
-    self.sessionPromise = ai.live.connect({
+    this.sessionPromise = ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-12-2025',
       callbacks: {
         onopen: () => {
@@ -355,47 +378,61 @@ export const geminiService = {
           processor.onaudioprocess = (e) => {
             const inputData = e.inputBuffer.getChannelData(0);
             const int16 = new Int16Array(inputData.length);
-            for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
-            self.sessionPromise?.then((session) => {
-               session.sendRealtimeInput({ media: { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' } });
+            for (let i = 0; i < inputData.length; i++) {
+              int16[i] = inputData[i] * 32768;
+            }
+            this.sessionPromise?.then((session) => {
+               session.sendRealtimeInput({ 
+                 media: { 
+                   data: encode(new Uint8Array(int16.buffer)), 
+                   mimeType: 'audio/pcm;rate=16000' 
+                 } 
+               });
             });
           };
           source.connect(processor);
           processor.connect(inputCtx.destination);
         },
         onmessage: async (msg) => {
-          const audio = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+          const parts = msg.serverContent?.modelTurn?.parts || [];
+          const audio = parts[0]?.inlineData?.data;
           if (audio) {
-            self.nextStartTime = Math.max(self.nextStartTime, outputCtx.currentTime);
+            this.nextStartTime = Math.max(this.nextStartTime, outputCtx.currentTime);
             const buffer = await decodeAudioData(decode(audio), outputCtx, 24000);
             const source = outputCtx.createBufferSource();
             source.buffer = buffer;
             source.connect(outputCtx.destination);
-            source.start(self.nextStartTime);
-            self.nextStartTime += buffer.duration;
+            source.start(this.nextStartTime);
+            this.nextStartTime += buffer.duration;
           }
           if (msg.serverContent?.interrupted) onInterrupted();
-          if (msg.serverContent?.outputTranscription) onMessage(msg.serverContent.outputTranscription.text);
+          if (msg.serverContent?.outputTranscription) {
+            onMessage(msg.serverContent.outputTranscription.text);
+          }
         }
       },
       config: {
         responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
-        systemInstruction: SYSTEM_INSTRUCTION + "\nLive link active. Be concise and authoritative.",
+        speechConfig: { 
+          voiceConfig: { 
+            prebuiltVoiceConfig: { voiceName: 'Zephyr' } 
+          } 
+        },
+        systemInstruction: SYSTEM_INSTRUCTION + "\nLive audio mode engaged. Keep responses concise and focused.",
         outputAudioTranscription: {},
         inputAudioTranscription: {}
       }
     });
-    self.liveSession = await self.sessionPromise;
+    this.liveSession = await this.sessionPromise;
   },
 
   async processConsoleCommand(command: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Execute: "${command}" for ${profile.fullName}.`,
+      contents: `Execute: "${command}" for user: ${profile.fullName}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
     });
-    return response.text || "Processed.";
+    return response.text || "Command execution yielded no textual results.";
   }
 };
