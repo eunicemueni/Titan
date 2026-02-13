@@ -32,7 +32,7 @@ async function decodeAudioData(
   sampleRate: number,
   numChannels: number,
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
+  const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 
@@ -77,17 +77,21 @@ export const geminiService = {
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
-        // responseMimeType is NOT permitted when using googleSearch tool
       }
     });
     
+    // Extract grounding URLs as per guidelines
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    console.debug("Grounding Chunks:", chunks);
+
     return extractJson(response.text || "") || [];
   },
 
   async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, type: string, hiringManager: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Complex text task: upgrade to gemini-3-pro-preview
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview',
       contents: `Tailor a job application for ${jobTitle} at ${companyName}. Type: ${type}. Manager: ${hiringManager}. Persona: ${JSON.stringify(profile)}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -121,6 +125,10 @@ export const geminiService = {
         tools: [{ googleSearch: {} }],
       }
     });
+    
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    console.debug("Grounding Sources:", chunks);
+
     return extractJson(response.text || "") || { email: "Not Found", personName: "Decision Maker" };
   },
 
@@ -134,6 +142,10 @@ export const geminiService = {
         tools: [{ googleSearch: {} }],
       }
     });
+
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    console.debug("Grounding Sources:", chunks);
+
     return extractJson(response.text || "") || [];
   },
 
@@ -172,13 +184,18 @@ export const geminiService = {
         tools: [{ googleSearch: {} }],
       }
     });
+
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    console.debug("Grounding Sources:", chunks);
+
     return extractJson(response.text || "") || [];
   },
 
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Complex reasoning task: upgrade to gemini-3-pro-preview
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview',
       contents: `Generate proposal for ${lead.name}. Service: ${service.name}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -229,6 +246,10 @@ export const geminiService = {
         tools: [{ googleSearch: {} }],
       }
     });
+
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    console.debug("Grounding Sources:", chunks);
+
     return extractJson(response.text || "") || [];
   },
 
@@ -242,13 +263,18 @@ export const geminiService = {
         tools: [{ googleSearch: {} }],
       }
     });
+
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    console.debug("Grounding Sources:", chunks);
+
     return extractJson(response.text || "") || [];
   },
 
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Complex text task: upgrade to gemini-3-pro-preview
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview',
       contents: `Tailor pitch for ${companyName}. Context: ${description}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -292,15 +318,17 @@ export const geminiService = {
             for (let i = 0; i < inputData.length; i++) {
               int16[i] = inputData[i] * 32768;
             }
-            // CRITICAL: Solely rely on sessionPromise resolves
-            activeSessionPromise?.then((session) => {
-              session.sendRealtimeInput({ 
-                media: { 
-                  data: encode(new Uint8Array(int16.buffer)), 
-                  mimeType: 'audio/pcm;rate=16000' 
-                } 
+            // CRITICAL: Solely rely on sessionPromise resolves, remove condition check ?. from instruction.
+            if (activeSessionPromise) {
+              activeSessionPromise.then((session) => {
+                session.sendRealtimeInput({ 
+                  media: { 
+                    data: encode(new Uint8Array(int16.buffer)), 
+                    mimeType: 'audio/pcm;rate=16000' 
+                  } 
+                });
               });
-            });
+            }
           };
           source.connect(processor);
           processor.connect(inputCtx.destination);
@@ -357,6 +385,6 @@ export const geminiService = {
       contents: `Execute: "${command}" for user: ${profile.fullName}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
     });
-    return response.text || "Command execution complete.";
+    return response.text || "Command execution yielded no result.";
   }
 };
