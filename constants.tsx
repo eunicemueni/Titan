@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { TelemetryLog } from './types';
 
 export const SYSTEM_NAME = "TITAN COMMAND AI";
 export const VERSION = "7.0.0-PRO";
@@ -13,7 +14,8 @@ export const COLORS = {
   border: '#30363d'
 };
 
-export const INITIAL_TELEMETRY = [
+// Fix: Added explicit TelemetryLog[] type to satisfy the state type in App.tsx
+export const INITIAL_TELEMETRY: TelemetryLog[] = [
   { id: '1', message: "Titan Command AI synchronized.", level: 'info', timestamp: Date.now() },
   { id: '2', message: "Multi-Persona Identity Vault loaded.", level: 'info', timestamp: Date.now() + 100 },
   { id: '3', message: "Cloud Node Status: Ready", level: 'success', timestamp: Date.now() + 200 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord, AppAnalytics, QueueStatus, TargetedCompany } from './types';
+import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord, AppAnalytics, TargetedCompany } from './types';
 import Dashboard from './modules/Dashboard';
 import MissionControl from './modules/MissionControl';
 import ScraperNode from './modules/JobAutopilot';

@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { UserProfile } from "../types";
 
@@ -26,24 +27,36 @@ function decode(base64: string) {
   return bytes;
 }
 
+// Fix: Updated decodeAudioData to handle multiple channels as per guidelines
 async function decodeAudioData(
   data: Uint8Array,
   ctx: AudioContext,
-  sampleRate: number
+  sampleRate: number,
+  numChannels: number,
 ): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
-  const buffer = ctx.createBuffer(1, dataInt16.length, sampleRate);
-  const channelData = buffer.getChannelData(0);
-  for (let i = 0; i < dataInt16.length; i++) {
-    channelData[i] = dataInt16[i] / 32768.0;
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
   }
   return buffer;
 }
 
+// Global state for live sessions to prevent context loss in callbacks
+let activeSessionPromise: Promise<any> | null = null;
+let nextAudioStartTime = 0;
+// Fix: Added activeSources to track and stop audio playback on interruption
+const activeSources = new Set<AudioBufferSourceNode>();
+
 export const geminiService = {
-  sessionPromise: null as Promise<any> | null,
-  liveSession: null as any,
-  nextStartTime: 0,
+  get liveSession() {
+    return activeSessionPromise;
+  },
 
   async performUniversalScrape(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -72,9 +85,9 @@ export const geminiService = {
     });
     
     try {
-      const text = response.text || "[]";
-      return JSON.parse(text);
+      return JSON.parse(response.text || "[]");
     } catch (e) {
+      console.error("Parse Fail:", e);
       return [];
     }
   },
@@ -100,8 +113,7 @@ export const geminiService = {
       }
     });
     try {
-      const text = response.text || "{}";
-      return JSON.parse(text);
+      return JSON.parse(response.text || "{}");
     } catch (e) {
       return {};
     }
@@ -127,8 +139,7 @@ export const geminiService = {
       }
     });
     try {
-      const text = response.text || '{"email": "Not Found", "personName": "Decision Maker"}';
-      return JSON.parse(text);
+      return JSON.parse(response.text || '{"email": "Not Found", "personName": "Decision Maker"}');
     } catch (e) {
       return { email: "Not Found", personName: "Decision Maker" };
     }
@@ -161,8 +172,7 @@ export const geminiService = {
       }
     });
     try {
-      const text = response.text || "[]";
-      return JSON.parse(text);
+      return JSON.parse(response.text || "[]");
     } catch (e) {
       return [];
     }
@@ -218,8 +228,7 @@ export const geminiService = {
       }
     });
     try {
-      const text = response.text || "[]";
-      return JSON.parse(text);
+      return JSON.parse(response.text || "[]");
     } catch (e) {
       return [];
     }
@@ -247,8 +256,7 @@ export const geminiService = {
       }
     });
     try {
-      const text = response.text || "{}";
-      return JSON.parse(text);
+      return JSON.parse(response.text || "{}");
     } catch (e) {
       return {};
     }
@@ -296,8 +304,7 @@ export const geminiService = {
       }
     });
     try {
-      const text = response.text || "[]";
-      return JSON.parse(text);
+      return JSON.parse(response.text || "[]");
     } catch (e) {
       return [];
     }
@@ -329,8 +336,7 @@ export const geminiService = {
       }
     });
     try {
-      const text = response.text || "[]";
-      return JSON.parse(text);
+      return JSON.parse(response.text || "[]");
     } catch (e) {
       return [];
     }
@@ -356,8 +362,7 @@ export const geminiService = {
       }
     });
     try {
-      const text = response.text || "{}";
-      return JSON.parse(text);
+      return JSON.parse(response.text || "{}");
     } catch (e) {
       return {};
     }
@@ -369,7 +374,10 @@ export const geminiService = {
     const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    this.sessionPromise = ai.live.connect({
+    nextAudioStartTime = 0;
+    activeSources.clear();
+
+    activeSessionPromise = ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-12-2025',
       callbacks: {
         onopen: () => {
@@ -381,14 +389,16 @@ export const geminiService = {
             for (let i = 0; i < inputData.length; i++) {
               int16[i] = inputData[i] * 32768;
             }
-            this.sessionPromise?.then((session) => {
-               session.sendRealtimeInput({ 
-                 media: { 
-                   data: encode(new Uint8Array(int16.buffer)), 
-                   mimeType: 'audio/pcm;rate=16000' 
-                 } 
-               });
-            });
+            if (activeSessionPromise) {
+              activeSessionPromise.then((session) => {
+                session.sendRealtimeInput({ 
+                  media: { 
+                    data: encode(new Uint8Array(int16.buffer)), 
+                    mimeType: 'audio/pcm;rate=16000' 
+                  } 
+                });
+              });
+            }
           };
           source.connect(processor);
           processor.connect(inputCtx.destination);
@@ -397,19 +407,33 @@ export const geminiService = {
           const parts = msg.serverContent?.modelTurn?.parts || [];
           const audio = parts[0]?.inlineData?.data;
           if (audio) {
-            this.nextStartTime = Math.max(this.nextStartTime, outputCtx.currentTime);
-            const buffer = await decodeAudioData(decode(audio), outputCtx, 24000);
+            nextAudioStartTime = Math.max(nextAudioStartTime, outputCtx.currentTime);
+            // Fix: Updated decodeAudioData call with channel count
+            const buffer = await decodeAudioData(decode(audio), outputCtx, 24000, 1);
             const source = outputCtx.createBufferSource();
             source.buffer = buffer;
             source.connect(outputCtx.destination);
-            source.start(this.nextStartTime);
-            this.nextStartTime += buffer.duration;
+            // Fix: tracking sources for interruption handling
+            source.addEventListener('ended', () => activeSources.delete(source));
+            source.start(nextAudioStartTime);
+            nextAudioStartTime += buffer.duration;
+            activeSources.add(source);
           }
-          if (msg.serverContent?.interrupted) onInterrupted();
+          if (msg.serverContent?.interrupted) {
+            // Fix: Properly stop audio playback on session interruption
+            for (const src of activeSources) {
+              src.stop();
+              activeSources.delete(src);
+            }
+            nextAudioStartTime = 0;
+            onInterrupted();
+          }
           if (msg.serverContent?.outputTranscription) {
             onMessage(msg.serverContent.outputTranscription.text);
           }
-        }
+        },
+        onclose: () => { activeSessionPromise = null; },
+        onerror: (e) => { console.error("Live Error:", e); }
       },
       config: {
         responseModalities: [Modality.AUDIO],
@@ -423,7 +447,8 @@ export const geminiService = {
         inputAudioTranscription: {}
       }
     });
-    this.liveSession = await this.sessionPromise;
+    
+    return activeSessionPromise;
   },
 
   async processConsoleCommand(command: string, profile: UserProfile) {
