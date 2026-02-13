@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { geminiService } from '../services/geminiService';
 
@@ -15,8 +14,12 @@ const NeuralLink: React.FC<NeuralLinkProps> = ({ isActive, onClose }) => {
     if (isActive) {
       startLiveLink();
     } else {
-      // Fix: Resolve session promise before calling close() to avoid TS error on Promise object
-      geminiService.liveSession?.then(session => session.close());
+      // Resolve the promise before closing the session
+      geminiService.liveSession?.then(session => {
+        if (session && typeof session.close === 'function') {
+          session.close();
+        }
+      });
     }
   }, [isActive]);
 
