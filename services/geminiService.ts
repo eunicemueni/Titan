@@ -5,7 +5,7 @@ const SYSTEM_INSTRUCTION = `SYSTEM: TITAN OS COMMAND AI.
 IDENTITY: High-level autonomous career operating system.
 GOAL: Maximize user revenue via 100% remote strategic nodes.
 CORE PERSO_DNA: Professional, authoritative, efficient.
-RULES: Use Google Search grounding for recent market data. When using search, return information clearly.`;
+RULES: Use Google Search grounding for recent market data. When using search, return information clearly and include factual URLs where available.`;
 
 function encode(bytes: Uint8Array) {
   let binary = '';
@@ -51,15 +51,25 @@ let nextAudioStartTime = 0;
 const activeSources = new Set<AudioBufferSourceNode>();
 
 /**
- * Helper to extract JSON from text when responseMimeType is not permitted (e.g. with Google Search)
+ * Robustly extracts JSON from LLM output, handling markdown blocks and raw text.
  */
 function extractJson(text: string): any {
+  if (!text) return null;
   try {
-    const match = text.match(/\[\s*\{.*\}\s*\]|\{\s*".*":.*\}/s);
-    if (match) return JSON.parse(match[0]);
-    return JSON.parse(text);
+    // Try finding JSON block in markdown
+    const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    const contentToParse = jsonBlockMatch ? jsonBlockMatch[1] : text;
+    
+    // Find first [ or { and last ] or } to isolate potential JSON
+    const firstBracket = contentToParse.search(/[\[\{]/);
+    const lastBracket = contentToParse.lastIndexOf(contentToParse.match(/[\]\}]/)?.[0] || '');
+    
+    if (firstBracket !== -1 && lastBracket !== -1) {
+      return JSON.parse(contentToParse.substring(firstBracket, lastBracket + 1));
+    }
+    return JSON.parse(contentToParse);
   } catch (e) {
-    console.warn("JSON Extraction Failed", e);
+    console.warn("Gemini JSON Extraction Failed:", e, "Raw Text:", text);
     return null;
   }
 }
@@ -73,23 +83,30 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return a list of 8 jobs in valid JSON format with keys: company, role, description, sourceUrl, location.`,
+      contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return a list of 8 jobs in valid JSON format with keys: company, role, description, sourceUrl, location. Provide the JSON inside a markdown block.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
       }
     });
     
-    // Extract grounding URLs as per guidelines
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    console.debug("Grounding Chunks:", chunks);
+    const text = response.text || "";
+    const results = extractJson(text) || [];
+    
+    // Extract grounding URLs and append them if they exist
+    const groundingSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    const sourceUrls = groundingSources
+      .filter(chunk => chunk.web?.uri)
+      .map(chunk => ({ title: chunk.web?.title, uri: chunk.web?.uri }));
 
-    return extractJson(response.text || "") || [];
+    return results.map((job: any) => ({
+      ...job,
+      metadata: { sources: sourceUrls }
+    }));
   },
 
   async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, type: string, hiringManager: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // Complex text task: upgrade to gemini-3-pro-preview
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Tailor a job application for ${jobTitle} at ${companyName}. Type: ${type}. Manager: ${hiringManager}. Persona: ${JSON.stringify(profile)}.`,
@@ -104,49 +121,42 @@ export const geminiService = {
             emailBody: { type: Type.STRING },
             subject: { type: Type.STRING },
           },
-          required: ["cv", "coverLetter", "emailBody", "subject"]
+          required: ["cv", "coverLetter", "emailBody", "subject"],
+          propertyOrdering: ["subject", "emailBody", "coverLetter", "cv"]
         }
       }
     });
-    try {
-      return JSON.parse(response.text || "{}");
-    } catch (e) {
-      return {};
-    }
+    return extractJson(response.text || "{}") || {};
   },
 
   async performDeepEmailScrape(companyName: string, domain: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Perform a deep search for the contact email of a decision maker at ${companyName} (${domain}). Return JSON: { "email": "string", "personName": "string" }.`,
+      contents: `Perform a deep search for the contact email of a decision maker at ${companyName} (${domain}). Return JSON: { "email": "string", "personName": "string" }. Provide JSON only.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
       }
     });
     
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    console.debug("Grounding Sources:", chunks);
-
-    return extractJson(response.text || "") || { email: "Not Found", personName: "Decision Maker" };
+    const text = response.text || "";
+    return extractJson(text) || { email: "Not Found", personName: "Decision Maker" };
   },
 
   async analyzeOperationalGaps(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Analyze operational gaps for companies in ${industry} within ${location}. Return a list of JSON objects: company, website, gaps (array), solution, projectedValue (number), complexity.`,
+      contents: `Analyze operational gaps for companies in ${industry} within ${location}. Return a list of JSON objects: company, website, gaps (array), solution, projectedValue (number), complexity. Provide JSON in markdown.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
       }
     });
 
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    console.debug("Grounding Sources:", chunks);
-
-    return extractJson(response.text || "") || [];
+    const text = response.text || "";
+    return extractJson(text) || [];
   },
 
   async enrichCompanyEmail(companyName: string, website: string) {
@@ -178,22 +188,19 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Identify 6 mid-large companies in ${industry} (${location}). Return JSON array: name, website, email, hiringContext.`,
+      contents: `Identify 6 mid-large companies in ${industry} (${location}). Return JSON array with fields: name, website, email, hiringContext. Wrap JSON in markdown.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
       }
     });
 
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    console.debug("Grounding Sources:", chunks);
-
-    return extractJson(response.text || "") || [];
+    const text = response.text || "";
+    return extractJson(text) || [];
   },
 
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // Complex reasoning task: upgrade to gemini-3-pro-preview
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Generate proposal for ${lead.name}. Service: ${service.name}.`,
@@ -209,15 +216,12 @@ export const geminiService = {
             valueProjection: { type: Type.STRING },
             emailBody: { type: Type.STRING },
           },
-          required: ["subject", "executiveSummary", "implementationPhases", "valueProjection", "emailBody"]
+          required: ["subject", "executiveSummary", "implementationPhases", "valueProjection", "emailBody"],
+          propertyOrdering: ["subject", "executiveSummary", "implementationPhases", "valueProjection", "emailBody"]
         }
       }
     });
-    try {
-      return JSON.parse(response.text || "{}");
-    } catch (e) {
-      return {};
-    }
+    return extractJson(response.text || "{}") || {};
   },
 
   async generateVision(prompt: string) {
@@ -240,42 +244,37 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search freelance gigs for: ${JSON.stringify(profile.expertiseBlocks)}. Return JSON array: title, platform, budget, description, applyUrl.`,
+      contents: `Search freelance gigs for: ${JSON.stringify(profile.expertiseBlocks)}. Return JSON array: title, platform, budget, description, applyUrl. Use markdown code blocks.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
       }
     });
 
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    console.debug("Grounding Sources:", chunks);
-
-    return extractJson(response.text || "") || [];
+    const text = response.text || "";
+    return extractJson(text) || [];
   },
 
   async scoutClientLeads(niche: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Identify agencies for ${niche}. Return JSON array: companyName, website, description, type, opportunityScore.`,
+      contents: `Identify agencies for ${niche}. Return JSON array: companyName, website, description, type, opportunityScore. Use markdown code blocks.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
       }
     });
 
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    console.debug("Grounding Sources:", chunks);
-
-    return extractJson(response.text || "") || [];
+    const text = response.text || "";
+    return extractJson(text) || [];
   },
 
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // Complex text task: upgrade to gemini-3-pro-preview
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Tailor pitch for ${companyName}. Context: ${description}.`,
+      contents: `Tailor pitch for ${companyName}. Context: ${description}. Profile: ${JSON.stringify(profile)}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
@@ -286,15 +285,12 @@ export const geminiService = {
             body: { type: Type.STRING },
             contactPersonStrategy: { type: Type.STRING },
           },
-          required: ["subject", "body", "contactPersonStrategy"]
+          required: ["subject", "body", "contactPersonStrategy"],
+          propertyOrdering: ["subject", "body", "contactPersonStrategy"]
         }
       }
     });
-    try {
-      return JSON.parse(response.text || "{}");
-    } catch (e) {
-      return {};
-    }
+    return extractJson(response.text || "{}") || {};
   },
 
   async connectLive(onMessage: (text: string) => void, onInterrupted: () => void) {
@@ -318,27 +314,27 @@ export const geminiService = {
             for (let i = 0; i < inputData.length; i++) {
               int16[i] = inputData[i] * 32768;
             }
-            // CRITICAL: Solely rely on sessionPromise resolves, remove condition check ?. from instruction.
-            if (activeSessionPromise) {
-              activeSessionPromise.then((session) => {
-                session.sendRealtimeInput({ 
-                  media: { 
-                    data: encode(new Uint8Array(int16.buffer)), 
-                    mimeType: 'audio/pcm;rate=16000' 
-                  } 
-                });
+            // CRITICAL: Solely rely on sessionPromise resolves
+            activeSessionPromise?.then((session) => {
+              session.sendRealtimeInput({ 
+                media: { 
+                  data: encode(new Uint8Array(int16.buffer)), 
+                  mimeType: 'audio/pcm;rate=16000' 
+                } 
               });
-            }
+            });
           };
           source.connect(processor);
           processor.connect(inputCtx.destination);
         },
         onmessage: async (msg) => {
           const parts = msg.serverContent?.modelTurn?.parts || [];
-          const audio = parts[0]?.inlineData?.data;
-          if (audio) {
+          const audioBase64 = parts[0]?.inlineData?.data;
+          
+          if (audioBase64) {
             nextAudioStartTime = Math.max(nextAudioStartTime, outputCtx.currentTime);
-            const buffer = await decodeAudioData(decode(audio), outputCtx, 24000, 1);
+            const audioData = decode(audioBase64);
+            const buffer = await decodeAudioData(audioData, outputCtx, 24000, 1);
             const source = outputCtx.createBufferSource();
             source.buffer = buffer;
             source.connect(outputCtx.destination);
@@ -347,20 +343,26 @@ export const geminiService = {
             nextAudioStartTime += buffer.duration;
             activeSources.add(source);
           }
+          
           if (msg.serverContent?.interrupted) {
             for (const src of activeSources) {
-              src.stop();
+              try { src.stop(); } catch(e) {}
               activeSources.delete(src);
             }
             nextAudioStartTime = 0;
             onInterrupted();
           }
+          
           if (msg.serverContent?.outputTranscription) {
             onMessage(msg.serverContent.outputTranscription.text);
           }
         },
-        onclose: () => { activeSessionPromise = null; },
-        onerror: (e) => { console.error("Neural Link Failure:", e); }
+        onclose: () => { 
+          activeSessionPromise = null; 
+        },
+        onerror: (e) => { 
+          console.error("Neural Link Failure:", e); 
+        }
       },
       config: {
         responseModalities: [Modality.AUDIO],
@@ -369,7 +371,7 @@ export const geminiService = {
             prebuiltVoiceConfig: { voiceName: 'Zephyr' } 
           } 
         },
-        systemInstruction: SYSTEM_INSTRUCTION + "\nUplink Established. Maintain brevity and strategic focus.",
+        systemInstruction: SYSTEM_INSTRUCTION + "\nUplink Established. Maintain brevity and strategic focus in all audio responses.",
         outputAudioTranscription: {},
         inputAudioTranscription: {}
       }
@@ -382,9 +384,9 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Execute: "${command}" for user: ${profile.fullName}.`,
+      contents: `Execute command: "${command}" for persona: ${profile.fullName}. Provide a concise confirmation or strategic output.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
     });
-    return response.text || "Command execution yielded no result.";
+    return response.text || "Command execution yielded no textual result.";
   }
 };
