@@ -113,19 +113,19 @@ const App: React.FC = () => {
   }, []);
 
   const renderView = () => {
-    const commonProps = {
+    // Specific props for each view to avoid spreading unnecessary props
+    const basicProps = {
       profile: currentProfile,
       onLog: addLog,
       onSent: handleSentRecord,
-      onBack: () => setCurrentView(AppView.DASHBOARD),
-      targetDailyCap
+      onBack: () => setCurrentView(AppView.DASHBOARD)
     };
 
     switch (currentView) {
       case AppView.MISSION_CONTROL:
         return (
           <MissionControl 
-            {...commonProps} 
+            {...basicProps} 
             jobs={jobs} 
             setJobs={setJobs} 
             isAutopilot={isAutopilotActive} 
@@ -134,33 +134,36 @@ const App: React.FC = () => {
             queueStatus={{waiting: 0, active: 0, completed: 0, failed: 0}} 
             evasionStatus="STEALTH" 
             missions={[]} 
+            targetDailyCap={targetDailyCap}
           />
         );
       case AppView.JOB_SCANNER:
         return (
           <ScraperNode 
-            {...commonProps} 
+            {...basicProps} 
             setJobs={setJobs} 
             jobs={jobs} 
             updateStats={updateStats} 
             bridgeStatus={hubOnline ? 'ONLINE' : 'OFFLINE'} 
             onReconnect={() => {}} 
+            targetDailyCap={targetDailyCap}
           />
         );
       case AppView.OUTREACH:
         return (
           <HiddenHunter 
-            {...commonProps} 
+            {...basicProps} 
             updateStats={updateStats} 
             companies={companies} 
             setCompanies={setCompanies} 
             evasionStatus="STEALTH" 
+            targetDailyCap={targetDailyCap}
           />
         );
       case AppView.INCOME_GIGS:
         return (
           <GigFlash 
-            {...commonProps} 
+            {...basicProps} 
             autoGigs={autoGigs} 
             setAutoGigs={setAutoGigs} 
             isAutopilot={isAutopilotActive} 
@@ -169,21 +172,21 @@ const App: React.FC = () => {
       case AppView.INCOME_B2B:
         return (
           <RevenueHubs 
-            {...commonProps} 
+            {...basicProps} 
             updateStats={updateStats} 
           />
         );
       case AppView.MARKET_NEXUS:
         return (
           <MarketNexus 
-            {...commonProps} 
+            {...basicProps} 
             updateStats={updateStats} 
           />
         );
       case AppView.CLIENT_NEXUS:
         return (
           <ClientNexus
-            {...commonProps}
+            {...basicProps}
             updateStats={updateStats}
           />
         );

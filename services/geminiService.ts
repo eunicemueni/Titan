@@ -5,7 +5,7 @@ const SYSTEM_INSTRUCTION = `SYSTEM: TITAN OS COMMAND AI.
 IDENTITY: High-level autonomous career operating system.
 GOAL: Maximize user revenue via 100% remote strategic nodes.
 CORE PERSO_DNA: Professional, authoritative, efficient.
-RULES: Use Google Search grounding for recent market data. Return valid JSON where requested.`;
+RULES: Use Google Search grounding for recent market data. When using search, return information clearly.`;
 
 function encode(bytes: Uint8Array) {
   let binary = '';
@@ -32,7 +32,7 @@ async function decodeAudioData(
   sampleRate: number,
   numChannels: number,
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
+  const dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 
@@ -50,6 +50,20 @@ let activeSessionPromise: Promise<any> | null = null;
 let nextAudioStartTime = 0;
 const activeSources = new Set<AudioBufferSourceNode>();
 
+/**
+ * Helper to extract JSON from text when responseMimeType is not permitted (e.g. with Google Search)
+ */
+function extractJson(text: string): any {
+  try {
+    const match = text.match(/\[\s*\{.*\}\s*\]|\{\s*".*":.*\}/s);
+    if (match) return JSON.parse(match[0]);
+    return JSON.parse(text);
+  } catch (e) {
+    console.warn("JSON Extraction Failed", e);
+    return null;
+  }
+}
+
 export const geminiService = {
   get liveSession() {
     return activeSessionPromise;
@@ -59,34 +73,15 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return a list of 8 jobs as valid JSON.`,
+      contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return a list of 8 jobs in valid JSON format with keys: company, role, description, sourceUrl, location.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              company: { type: Type.STRING },
-              role: { type: Type.STRING },
-              description: { type: Type.STRING },
-              sourceUrl: { type: Type.STRING },
-              location: { type: Type.STRING },
-            },
-            required: ["company", "role", "description", "sourceUrl", "location"]
-          }
-        }
+        // responseMimeType is NOT permitted when using googleSearch tool
       }
     });
     
-    try {
-      return JSON.parse(response.text || "[]");
-    } catch (e) {
-      console.error("Gemini Parse Fail:", e);
-      return [];
-    }
+    return extractJson(response.text || "") || [];
   },
 
   async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, type: string, hiringManager: string) {
@@ -120,59 +115,26 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Perform a deep search for the contact email of a decision maker at ${companyName} (${domain}).`,
+      contents: `Perform a deep search for the contact email of a decision maker at ${companyName} (${domain}). Return JSON: { "email": "string", "personName": "string" }.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            email: { type: Type.STRING },
-            personName: { type: Type.STRING },
-          },
-          required: ["email", "personName"]
-        }
       }
     });
-    try {
-      return JSON.parse(response.text || '{"email": "Not Found", "personName": "Decision Maker"}');
-    } catch (e) {
-      return { email: "Not Found", personName: "Decision Maker" };
-    }
+    return extractJson(response.text || "") || { email: "Not Found", personName: "Decision Maker" };
   },
 
   async analyzeOperationalGaps(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Analyze operational gaps for companies in ${industry} within ${location}.`,
+      contents: `Analyze operational gaps for companies in ${industry} within ${location}. Return a list of JSON objects: company, website, gaps (array), solution, projectedValue (number), complexity.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              company: { type: Type.STRING },
-              website: { type: Type.STRING },
-              gaps: { type: Type.ARRAY, items: { type: Type.STRING } },
-              solution: { type: Type.STRING },
-              projectedValue: { type: Type.NUMBER },
-              complexity: { type: Type.STRING },
-            },
-            required: ["company", "website", "gaps", "solution", "projectedValue", "complexity"]
-          }
-        }
       }
     });
-    try {
-      return JSON.parse(response.text || "[]");
-    } catch (e) {
-      return [];
-    }
+    return extractJson(response.text || "") || [];
   },
 
   async enrichCompanyEmail(companyName: string, website: string) {
@@ -204,31 +166,13 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Identify 6 mid-large companies in ${industry} (${location}).`,
+      contents: `Identify 6 mid-large companies in ${industry} (${location}). Return JSON array: name, website, email, hiringContext.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              website: { type: Type.STRING },
-              email: { type: Type.STRING },
-              hiringContext: { type: Type.STRING },
-            },
-            required: ["name", "website", "hiringContext"]
-          }
-        }
       }
     });
-    try {
-      return JSON.parse(response.text || "[]");
-    } catch (e) {
-      return [];
-    }
+    return extractJson(response.text || "") || [];
   },
 
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
@@ -279,64 +223,26 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search freelance gigs for: ${JSON.stringify(profile.expertiseBlocks)}.`,
+      contents: `Search freelance gigs for: ${JSON.stringify(profile.expertiseBlocks)}. Return JSON array: title, platform, budget, description, applyUrl.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              platform: { type: Type.STRING },
-              budget: { type: Type.STRING },
-              description: { type: Type.STRING },
-              applyUrl: { type: Type.STRING },
-            },
-            required: ["title", "platform", "budget", "description", "applyUrl"]
-          }
-        }
       }
     });
-    try {
-      return JSON.parse(response.text || "[]");
-    } catch (e) {
-      return [];
-    }
+    return extractJson(response.text || "") || [];
   },
 
   async scoutClientLeads(niche: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Identify agencies for ${niche}.`,
+      contents: `Identify agencies for ${niche}. Return JSON array: companyName, website, description, type, opportunityScore.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              companyName: { type: Type.STRING },
-              website: { type: Type.STRING },
-              description: { type: Type.STRING },
-              type: { type: Type.STRING },
-              opportunityScore: { type: Type.NUMBER },
-            },
-            required: ["companyName", "website", "description", "type", "opportunityScore"]
-          }
-        }
       }
     });
-    try {
-      return JSON.parse(response.text || "[]");
-    } catch (e) {
-      return [];
-    }
+    return extractJson(response.text || "") || [];
   },
 
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
@@ -386,16 +292,15 @@ export const geminiService = {
             for (let i = 0; i < inputData.length; i++) {
               int16[i] = inputData[i] * 32768;
             }
-            if (activeSessionPromise) {
-              activeSessionPromise.then((session) => {
-                session.sendRealtimeInput({ 
-                  media: { 
-                    data: encode(new Uint8Array(int16.buffer)), 
-                    mimeType: 'audio/pcm;rate=16000' 
-                  } 
-                });
+            // CRITICAL: Solely rely on sessionPromise resolves
+            activeSessionPromise?.then((session) => {
+              session.sendRealtimeInput({ 
+                media: { 
+                  data: encode(new Uint8Array(int16.buffer)), 
+                  mimeType: 'audio/pcm;rate=16000' 
+                } 
               });
-            }
+            });
           };
           source.connect(processor);
           processor.connect(inputCtx.destination);
