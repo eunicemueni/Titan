@@ -14,7 +14,7 @@ const NeuralLink: React.FC<NeuralLinkProps> = ({ isActive, onClose }) => {
     if (isActive) {
       startLiveLink();
     } else {
-      // Resolve the promise before closing the session
+      // Corrected: Resolve the session promise before closing
       geminiService.liveSession?.then(session => {
         if (session && typeof session.close === 'function') {
           session.close();

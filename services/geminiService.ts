@@ -8,7 +8,7 @@ CORE PERSO_DNA: Professional, authoritative, efficient.
 RULES: Use Google Search grounding for recent market data. When using search, return information clearly and include factual URLs where available from the grounding metadata.`;
 
 /**
- * Manual Base64 encoding/decoding as required by @google/genai guidelines.
+ * Manual Base64 encoding/decoding utilities as per SDK requirements.
  */
 function encode(bytes: Uint8Array): string {
   let binary = '';
@@ -31,7 +31,7 @@ function decode(base64: string): Uint8Array {
 
 /**
  * Decodes raw PCM audio data into an AudioBuffer.
- * The Gemini Live API sends raw bytes (no header), so standard decodeAudioData fails.
+ * Required because browser decodeAudioData does not support raw PCM streams without headers.
  */
 async function decodeAudioData(
   data: Uint8Array,
@@ -53,15 +53,18 @@ async function decodeAudioData(
 }
 
 /**
- * Extracts JSON from model output when responseMimeType is unavailable (due to tool use).
+ * Robustly extracts JSON from LLM text output.
+ * Necessary because responseMimeType: "application/json" cannot be used with googleSearch tools.
  */
 function extractJson(text: string | undefined): any {
   if (!text) return null;
   try {
     const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     const contentToParse = jsonBlockMatch ? jsonBlockMatch[1] : text;
+    
     const firstBracket = contentToParse.search(/[\[\{]/);
     const lastBracket = contentToParse.lastIndexOf(contentToParse.match(/[\]\}]/)?.[0] || '');
+    
     if (firstBracket !== -1 && lastBracket !== -1) {
       return JSON.parse(contentToParse.substring(firstBracket, lastBracket + 1));
     }
@@ -84,11 +87,10 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return a list of 8 jobs in valid JSON format with keys: company, role, description, sourceUrl, location. Wrap JSON in a markdown block.`,
+      contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return a list of 8 jobs in valid JSON format with keys: company, role, description, sourceUrl, location. Provide the JSON inside a markdown block.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }],
-        // responseMimeType is NOT allowed with googleSearch
       }
     });
     
@@ -131,7 +133,7 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search for contact email for decision maker at ${companyName} (${domain}). Return JSON only: { "email": "string", "personName": "string" }.`,
+      contents: `Search Google for the contact email of a decision maker at ${companyName} (${domain}). Return JSON only: { "email": "string", "personName": "string" }.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -144,7 +146,7 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Analyze operational gaps for companies in ${industry} within ${location}. Return list of JSON objects: company, website, gaps (array), solution, projectedValue (number).`,
+      contents: `Analyze operational gaps for companies in ${industry} within ${location}. Return a list of JSON objects: company, website, gaps (array), solution, projectedValue (number). Provide JSON in markdown.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -172,7 +174,7 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Generate B2B pitch for ${companyName}. Gaps: ${gaps.join(', ')}. Solution: ${solution}.`,
+      contents: `Generate a B2B pitch for ${companyName}. Gaps: ${gaps.join(', ')}. Solution: ${solution}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
     });
     return response.text || "";
@@ -182,7 +184,7 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Identify 6 mid-large companies in ${industry} (${location}). Return JSON array with name, website, email, hiringContext.`,
+      contents: `Identify 6 mid-large companies in ${industry} (${location}). Return JSON array with fields: name, website, email, hiringContext.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -206,7 +208,7 @@ export const geminiService = {
             executiveSummary: { type: Type.STRING },
             implementationPhases: { type: Type.STRING },
             valueProjection: { type: Type.STRING },
-            emailBody: { type: Type.STRING }
+            emailBody: { type: Type.STRING },
           },
           required: ["subject", "executiveSummary", "implementationPhases", "valueProjection", "emailBody"]
         }
@@ -229,7 +231,7 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search for high-velocity freelance gigs matching expertise: ${JSON.stringify(profile.expertiseBlocks)}. Return JSON array.`,
+      contents: `Search Google for active high-velocity freelance gigs matching expertise: ${JSON.stringify(profile.expertiseBlocks)}. Return JSON array.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -255,7 +257,7 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Tailor pitch for ${companyName}. Info: ${description}. Profile: ${JSON.stringify(profile)}.`,
+      contents: `Tailor a pitch for ${companyName}. Info: ${description}. Profile: ${JSON.stringify(profile)}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
@@ -291,8 +293,9 @@ export const geminiService = {
           const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
           scriptProcessor.onaudioprocess = (event) => {
             const inputData = event.inputBuffer.getChannelData(0);
-            const int16 = new Int16Array(inputData.length);
-            for (let i = 0; i < inputData.length; i++) {
+            const l = inputData.length;
+            const int16 = new Int16Array(l);
+            for (let i = 0; i < l; i++) {
               int16[i] = inputData[i] * 32768;
             }
             const pcmBlob = {
@@ -317,6 +320,7 @@ export const geminiService = {
             activeSources.add(source);
             source.onended = () => activeSources.delete(source);
           }
+
           if (message.serverContent?.outputTranscription) {
             onTranscription(message.serverContent.outputTranscription.text);
           }
