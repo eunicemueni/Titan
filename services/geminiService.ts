@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { UserProfile } from "../types";
 
@@ -27,7 +26,6 @@ function decode(base64: string) {
   return bytes;
 }
 
-// Fix: Updated decodeAudioData to handle multiple channels as per guidelines
 async function decodeAudioData(
   data: Uint8Array,
   ctx: AudioContext,
@@ -47,10 +45,9 @@ async function decodeAudioData(
   return buffer;
 }
 
-// Global state for live sessions to prevent context loss in callbacks
+// Global reference for the live session to ensure callbacks can always access the active session
 let activeSessionPromise: Promise<any> | null = null;
 let nextAudioStartTime = 0;
-// Fix: Added activeSources to track and stop audio playback on interruption
 const activeSources = new Set<AudioBufferSourceNode>();
 
 export const geminiService = {
@@ -87,7 +84,7 @@ export const geminiService = {
     try {
       return JSON.parse(response.text || "[]");
     } catch (e) {
-      console.error("Parse Fail:", e);
+      console.error("Gemini Parse Fail:", e);
       return [];
     }
   },
@@ -408,19 +405,16 @@ export const geminiService = {
           const audio = parts[0]?.inlineData?.data;
           if (audio) {
             nextAudioStartTime = Math.max(nextAudioStartTime, outputCtx.currentTime);
-            // Fix: Updated decodeAudioData call with channel count
             const buffer = await decodeAudioData(decode(audio), outputCtx, 24000, 1);
             const source = outputCtx.createBufferSource();
             source.buffer = buffer;
             source.connect(outputCtx.destination);
-            // Fix: tracking sources for interruption handling
             source.addEventListener('ended', () => activeSources.delete(source));
             source.start(nextAudioStartTime);
             nextAudioStartTime += buffer.duration;
             activeSources.add(source);
           }
           if (msg.serverContent?.interrupted) {
-            // Fix: Properly stop audio playback on session interruption
             for (const src of activeSources) {
               src.stop();
               activeSources.delete(src);
@@ -433,7 +427,7 @@ export const geminiService = {
           }
         },
         onclose: () => { activeSessionPromise = null; },
-        onerror: (e) => { console.error("Live Error:", e); }
+        onerror: (e) => { console.error("Neural Link Failure:", e); }
       },
       config: {
         responseModalities: [Modality.AUDIO],
@@ -442,7 +436,7 @@ export const geminiService = {
             prebuiltVoiceConfig: { voiceName: 'Zephyr' } 
           } 
         },
-        systemInstruction: SYSTEM_INSTRUCTION + "\nLive audio mode engaged. Keep responses concise and focused.",
+        systemInstruction: SYSTEM_INSTRUCTION + "\nUplink Established. Maintain brevity and strategic focus.",
         outputAudioTranscription: {},
         inputAudioTranscription: {}
       }
@@ -458,6 +452,6 @@ export const geminiService = {
       contents: `Execute: "${command}" for user: ${profile.fullName}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
     });
-    return response.text || "Command execution yielded no textual results.";
+    return response.text || "Command execution complete.";
   }
 };

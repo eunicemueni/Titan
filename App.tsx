@@ -9,6 +9,7 @@ import IdentityVault from './modules/IdentityVault';
 import SystemDeploy from './modules/SystemDeploy';
 import GigFlash from './modules/GigFlash';
 import MarketNexus from './modules/MarketNexus';
+import ClientNexus from './modules/ClientNexus';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Console from './components/Console';
@@ -177,6 +178,13 @@ const App: React.FC = () => {
           <MarketNexus 
             {...commonProps} 
             updateStats={updateStats} 
+          />
+        );
+      case AppView.CLIENT_NEXUS:
+        return (
+          <ClientNexus
+            {...commonProps}
+            updateStats={updateStats}
           />
         );
       case AppView.PROFILE:
