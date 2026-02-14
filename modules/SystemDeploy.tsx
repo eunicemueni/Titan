@@ -4,159 +4,124 @@ import { supabase } from '../services/supabaseService';
 
 interface SystemDeployProps {
   onLog: (msg: string, level: TelemetryLog['level']) => void;
-  bridgeStatus: 'OFFLINE' | 'CONNECTING' | 'ONLINE';
+  bridgeStatus: 'OFFLINE' | 'ONLINE';
   onReconnect: () => void;
 }
 
-const SystemDeploy: React.FC<SystemDeployProps> = ({ onLog }) => {
+const SystemDeploy: React.FC<SystemDeployProps> = ({ onLog, bridgeStatus }) => {
   const [dbStatus, setDbStatus] = useState<'IDLE' | 'CONNECTED' | 'ERROR'>('IDLE');
-  const [hubStatus, setHubStatus] = useState<'IDLE' | 'CONNECTED' | 'ERROR'>('IDLE');
-  const [redisStatus, setRedisStatus] = useState<'IDLE' | 'CONNECTED' | 'ERROR'>('IDLE');
-  const [geminiStatus, setGeminiStatus] = useState<'IDLE' | 'CONNECTED' | 'ERROR'>('IDLE');
+  const [engineHealth, setEngineHealth] = useState<any>(null);
   
-  const [activeSpec, setActiveSpec] = useState<'DOCKER' | 'RENDER' | 'VARS'>('VARS');
+  const checkHealth = async () => {
+    try {
+      // Check Supabase
+      const { error } = await supabase.from('titan_jobs').select('id').limit(1);
+      setDbStatus(error ? 'ERROR' : 'CONNECTED');
+
+      // Check Engine (Backend)
+      const res = await fetch('/api/health');
+      if (res.ok) {
+        const data = await res.json();
+        setEngineHealth(data);
+      } else {
+        setEngineHealth({ status: 'OFFLINE' });
+      }
+    } catch (e) {
+      setDbStatus('ERROR');
+      setEngineHealth({ status: 'OFFLINE' });
+    }
+  };
 
   useEffect(() => {
-    const checkConnections = async () => {
-      try {
-        const { error } = await supabase.from('titan_jobs').select('id').limit(1);
-        setDbStatus(error ? 'ERROR' : 'CONNECTED');
-      } catch (e) { setDbStatus('ERROR'); }
-
-      try {
-        const res = await fetch('/api/health');
-        const data = await res.json();
-        setHubStatus('CONNECTED');
-        setRedisStatus(data.redis === 'ready' || data.redis === 'connect' ? 'CONNECTED' : 'ERROR');
-      } catch (e) { 
-        setHubStatus('ERROR');
-        setRedisStatus('ERROR'); 
-      }
-
-      setGeminiStatus(process.env.API_KEY ? 'CONNECTED' : 'ERROR');
-    };
-    checkConnections();
-    const interval = setInterval(checkConnections, 5000);
+    checkHealth();
+    const interval = setInterval(checkHealth, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    onLog(`COPIED: ${label} cached to clipboard.`, "success");
-  };
-
-  const dockerContent = `FROM node:20-slim
-RUN apt-get update && apt-get install -y chromium libxss1 --no-install-recommends
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-RUN npm run build
-EXPOSE 3001
-CMD ["node", "server.js"]`;
-
   return (
-    <div className="space-y-12 pb-40 px-4 md:px-20 pt-10 animate-in fade-in duration-1000">
+    <div className="space-y-12 pb-40 px-6 md:px-20 pt-10 animate-in fade-in duration-1000 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="space-y-4">
-           <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase italic leading-none">Deployment War Room</h2>
-           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Core Infrastructure Diagnostics & Recovery</p>
+           <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter uppercase italic leading-none">Bridge Console</h2>
+           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.4em]">Autonomous System Architecture</p>
         </div>
-        <div className="flex gap-4">
-           <button onClick={() => setActiveSpec('VARS')} className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${activeSpec === 'VARS' ? 'bg-white text-black' : 'bg-slate-900 text-slate-500'}`}>Variables</button>
-           <button onClick={() => setActiveSpec('DOCKER')} className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${activeSpec === 'DOCKER' ? 'bg-white text-black' : 'bg-slate-900 text-slate-500'}`}>Dockerfile</button>
-           <button onClick={() => setActiveSpec('RENDER')} className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${activeSpec === 'RENDER' ? 'bg-white text-black' : 'bg-slate-900 text-slate-500'}`}>Render Blueprints</button>
+        <div className="flex items-center gap-4">
+           <div className={`px-6 py-3 rounded-2xl border flex items-center gap-3 transition-all ${bridgeStatus === 'ONLINE' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/5 bg-slate-950'}`}>
+              <div className={`w-2 h-2 rounded-full ${bridgeStatus === 'ONLINE' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
+              <span className="text-[9px] font-black text-white uppercase tracking-widest">Neural Link: {bridgeStatus}</span>
+           </div>
         </div>
       </div>
 
-      {hubStatus === 'ERROR' && (
-        <div className="p-10 bg-red-500/10 border border-red-500/20 rounded-[3rem] space-y-6">
-           <div className="flex items-center gap-4">
-              <span className="w-10 h-10 bg-red-500 rounded-2xl flex items-center justify-center text-white font-black shadow-lg shadow-red-500/20">!</span>
-              <h3 className="text-xl font-black text-red-500 uppercase tracking-widest italic">Node Link Broken (100% Diagnostic Found)</h3>
-           </div>
-           <p className="text-sm text-slate-400 font-bold uppercase leading-relaxed max-w-4xl">
-              Static site hosts (Vercel/Netlify) **cannot run the TITAN Server**. 
-              You must use a platform that supports **Docker** or **Web Services** to enable background job relays and neural link audio.
-           </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
-        {[
-          { label: 'Server Hub', status: hubStatus, color: 'indigo', desc: 'Active Node Process' },
-          { label: 'Cloud Buffer', status: redisStatus, color: 'cyan', desc: 'Redis Mission Queue' },
-          { label: 'Neural Core', status: geminiStatus, color: 'purple', desc: 'Gemini v3 API' },
-          { label: 'Persistence', status: dbStatus, color: 'emerald', desc: 'Supabase Data Link' }
-        ].map(node => (
-          <div key={node.label} className={`p-8 md:p-10 rounded-[3rem] border transition-all duration-700 ${node.status === 'CONNECTED' ? `bg-${node.color}-500/5 border-${node.color}-500/20 shadow-2xl shadow-${node.color}-500/5` : 'bg-red-500/10 border-red-500/30'}`}>
-            <h3 className="text-lg font-black text-white uppercase italic mb-1">{node.label}</h3>
-            <p className="text-[8px] font-bold text-slate-700 uppercase tracking-widest mb-6">{node.desc}</p>
-            <div className="flex items-center justify-between">
-              <span className={`text-[8px] font-black px-4 py-1.5 rounded-full ${node.status === 'CONNECTED' ? `bg-${node.color}-500 text-white shadow-lg` : 'bg-red-500 text-white'}`}>
-                {node.status}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* The Engine Card */}
+        <div className={`p-10 rounded-[3rem] border bg-slate-950 transition-all ${engineHealth?.status === 'ACTIVE' ? 'border-indigo-500/30 shadow-[0_0_50px_rgba(99,102,241,0.1)]' : 'border-white/5'}`}>
+           <div className="flex justify-between items-start mb-10">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Phase 01: The Engine</span>
+              <span className={`px-4 py-1.5 rounded-full text-[8px] font-black ${engineHealth?.status === 'ACTIVE' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                {engineHealth?.status || 'OFFLINE'}
               </span>
-              <div className={`w-1 h-1 rounded-full ${node.status === 'CONNECTED' ? 'bg-white animate-ping' : 'bg-slate-800'}`}></div>
-            </div>
-          </div>
-        ))}
+           </div>
+           <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-4">Autonomous Backend</h3>
+           <p className="text-xs text-slate-500 leading-relaxed mb-8">
+             Located in <code>services/server.js</code>. This is the "Brain" that runs the Puppeteer workers. It requires a Redis instance to manage missions.
+           </p>
+           <div className="space-y-3">
+             <div className="p-4 bg-black/60 rounded-xl border border-white/5 font-mono text-[9px] text-slate-400">
+                WORKER_SYNC: {engineHealth?.worker || 'AWAITING_RELAY'}
+             </div>
+             <div className="p-4 bg-black/60 rounded-xl border border-white/5 font-mono text-[9px] text-slate-400">
+                REDIS_NODE: {engineHealth?.redis || 'AWAITING_LINK'}
+             </div>
+           </div>
+        </div>
+
+        {/* The Interface Card */}
+        <div className={`p-10 rounded-[3rem] border bg-slate-950 transition-all ${dbStatus === 'CONNECTED' ? 'border-cyan-500/30 shadow-[0_0_50px_rgba(6,182,212,0.1)]' : 'border-white/5'}`}>
+           <div className="flex justify-between items-start mb-10">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Phase 02: The Interface</span>
+              <span className={`px-4 py-1.5 rounded-full text-[8px] font-black ${dbStatus === 'CONNECTED' ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                {dbStatus === 'CONNECTED' ? 'LOCKED' : 'SYNC_ERROR'}
+              </span>
+           </div>
+           <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-4">Command Dashboard</h3>
+           <p className="text-xs text-slate-500 leading-relaxed mb-8">
+             This is the static frontend you are using right now. It connects to Phase 01 via the Neural Bridge Link.
+           </p>
+           <div className="flex items-center gap-4 text-[10px] font-black text-cyan-400 uppercase tracking-widest bg-cyan-500/5 p-4 rounded-xl border border-cyan-500/10">
+              <span className={`w-2 h-2 rounded-full ${dbStatus === 'CONNECTED' ? 'bg-cyan-500 animate-pulse' : 'bg-slate-800'}`}></span>
+              Persistence Node: {dbStatus}
+           </div>
+        </div>
       </div>
 
-      <div className="bg-slate-950 border border-white/5 rounded-[4rem] p-12 space-y-12 shadow-2xl">
-         {activeSpec === 'VARS' && (
-           <div className="animate-in fade-in zoom-in-95 duration-500 space-y-12">
-              <div className="flex justify-between items-center">
-                 <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.5em]">Environment Variables</h4>
-                 <button onClick={() => copyToClipboard('API_KEY, REDIS_URL, PORT', 'Var Keys')} className="text-[7px] font-black text-indigo-400 hover:text-white transition-colors">Copy Keys Only</button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                 <div className="p-8 bg-black/40 rounded-3xl border border-white/5 space-y-4">
-                    <span className="text-[9px] font-black text-white uppercase">API_KEY</span>
-                    <p className="text-[8px] text-slate-600 uppercase tracking-widest leading-relaxed">Required for Gemini Neural Processing. Obtained from ai.google.dev.</p>
-                 </div>
-                 <div className="p-8 bg-black/40 rounded-3xl border border-white/5 space-y-4">
-                    <span className="text-[9px] font-black text-white uppercase">REDIS_URL</span>
-                    <p className="text-[8px] text-slate-600 uppercase tracking-widest leading-relaxed">Required for Mission Buffer. TITAN provides an embedded URL in the core, but you can override it.</p>
-                 </div>
-              </div>
-           </div>
-         )}
-
-         {activeSpec === 'DOCKER' && (
-            <div className="animate-in fade-in zoom-in-95 duration-500 space-y-8">
-               <div className="flex justify-between items-center">
-                  <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.5em]">The Iron Link (Dockerfile)</h4>
-                  <button onClick={() => copyToClipboard(dockerContent, 'Dockerfile')} className="px-6 py-2 bg-indigo-600 text-white text-[8px] font-black uppercase rounded-full shadow-lg">Copy Dockerfile</button>
-               </div>
-               <div className="bg-black rounded-3xl p-8 border border-white/5">
-                  <pre className="text-[10px] font-mono text-slate-400 leading-relaxed overflow-x-auto whitespace-pre-wrap">
-                    {dockerContent}
-                  </pre>
-               </div>
-               <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest leading-relaxed text-center">
-                 This file ensures Chromium is installed in the cloud OS. Without it, autonomous navigation will fail.
+      <div className="bg-slate-950 border border-white/5 rounded-[4rem] p-12 space-y-10 shadow-2xl relative overflow-hidden">
+         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[80px] pointer-events-none"></div>
+         <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.6em]">Two-Phase Deployment Blueprint</h4>
+         
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative z-10">
+            <div className="space-y-4 p-8 bg-black/40 rounded-[2.5rem] border border-white/5 hover:border-indigo-500/20 transition-all group">
+               <span className="text-indigo-500 font-black text-2xl italic group-hover:scale-110 transition-transform block">01.</span>
+               <p className="text-[11px] text-white font-black uppercase tracking-widest">Deploy Engine (Web)</p>
+               <p className="text-[9px] text-slate-600 uppercase leading-relaxed">
+                 Deploy <code>services/server.js</code> on Render as a <b>Web Service (Docker)</b>. Add your Gemini Key to the env vars.
                </p>
             </div>
-         )}
-
-         {activeSpec === 'RENDER' && (
-            <div className="animate-in fade-in zoom-in-95 duration-500 space-y-8">
-               <div className="flex justify-between items-center">
-                  <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.5em]">One-Click Blueprint (render.yaml)</h4>
-               </div>
-               <div className="p-10 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl space-y-6">
-                  <h5 className="text-white text-[11px] font-black uppercase italic tracking-tighter">Instructions for Render.com</h5>
-                  <ol className="list-decimal list-inside text-[10px] text-slate-400 font-bold uppercase space-y-4 tracking-widest leading-loose">
-                     <li>Create a file named <span className="text-white">render.yaml</span> in your repo root.</li>
-                     <li>Paste the Render Blueprint code from the core file.</li>
-                     <li>Go to Render Dashboard &gt; <span className="text-white">Blueprints</span> &gt; <span className="text-white">New Blueprint Instance</span>.</li>
-                     <li>Render will automatically setup the Server, Redis, and Port 3001.</li>
-                  </ol>
-               </div>
+            <div className="space-y-4 p-8 bg-black/40 rounded-[2.5rem] border border-white/5 hover:border-indigo-500/20 transition-all group">
+               <span className="text-indigo-500 font-black text-2xl italic group-hover:scale-110 transition-transform block">02.</span>
+               <p className="text-[11px] text-white font-black uppercase tracking-widest">Link Neural Bridge</p>
+               <p className="text-[9px] text-slate-600 uppercase leading-relaxed">
+                 Once Phase 01 is live, copy its URL. This is the API endpoint for your dashboard.
+               </p>
             </div>
-         )}
+            <div className="space-y-4 p-8 bg-black/40 rounded-[2.5rem] border border-white/5 hover:border-indigo-500/20 transition-all group">
+               <span className="text-indigo-500 font-black text-2xl italic group-hover:scale-110 transition-transform block">03.</span>
+               <p className="text-[11px] text-white font-black uppercase tracking-widest">Deploy Interface (Static)</p>
+               <p className="text-[9px] text-slate-600 uppercase leading-relaxed">
+                 Deploy the root as a <b>Static Site</b>. Add <code>VITE_API_URL</code> pointing to your Phase 01 URL.
+               </p>
+            </div>
+         </div>
       </div>
     </div>
   );

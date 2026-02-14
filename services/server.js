@@ -31,11 +31,9 @@ try {
 
   relayQueue = new Queue('RelayQueue', { connection: redisConnection });
   
-  // THE TITAN WORKER: This is where the 2000+ jobs are actually applied to.
   const worker = new Worker('RelayQueue', async job => {
     console.log(`[TITAN_NODE] Commencing Mission: ${job.data.recipient} | ${job.data.subject}`);
     
-    // Launching the headless actor
     const browser = await puppeteer.launch({
       executablePath: PUPPETEER_PATH,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
@@ -45,11 +43,9 @@ try {
       const page = await browser.newPage();
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       
-      // Mission execution logic: Searching for the apply page
       const searchQuery = `apply to ${job.data.subject} at ${job.data.recipient}`;
       await page.goto(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`);
       
-      // Simulate intelligent interaction
       await new Promise(r => setTimeout(r, 2000));
       
       console.log(`[MISSION_SUCCESS] Autonomous application submitted for ${job.data.recipient}.`);
@@ -60,7 +56,7 @@ try {
     } finally {
       await browser.close();
     }
-  }, { connection: redisConnection, concurrency: 5 }); // Multi-threaded handling for scale
+  }, { connection: redisConnection, concurrency: 5 });
 
   console.log('TITAN_OS: Autonomous Worker Synchronized.');
 } catch (e) {
@@ -91,7 +87,7 @@ app.post('/api/scrape', async (req, res) => {
   }
 });
 
-// DISPATCH RELAY (The "Set and Go" Endpoint)
+// DISPATCH RELAY
 app.post('/api/dispatch', async (req, res) => {
   const { recipient, subject, body, type } = req.body;
   if (relayQueue) {
@@ -113,14 +109,6 @@ app.get('/api/health', (req, res) => {
     worker: 'SYNCHRONIZED',
     platform: 'TITAN_CORE_PRIME'
   });
-});
-
-const distPath = path.join(__dirname, '../dist');
-app.use(express.static(distPath));
-
-app.get('*', (req, res) => {
-  if (req.path.startsWith('/api')) return;
-  res.sendFile(path.join(distPath, 'index.html'));
 });
 
 const server = http.createServer(app);

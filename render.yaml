@@ -1,6 +1,7 @@
 services:
+  # PHASE 01: THE TITAN ENGINE (Backend Automation)
   - type: web
-    name: titan-os-hub
+    name: titan-os-engine
     runtime: docker
     plan: free
     region: oregon
@@ -10,9 +11,27 @@ services:
       - key: NODE_ENV
         value: production
       - key: API_KEY
-        sync: false
+        sync: false # Set your Gemini API Key in Render Dashboard
       - key: REDIS_URL
-        sync: false
+        sync: false # Add a Redis instance in Render and link the URL here
     healthCheckPath: /api/health
     dockerContext: .
-    dockerfilePath: Dockerfile
+    dockerfilePath: services/Dockerfile
+
+  # PHASE 02: THE TITAN INTERFACE (Frontend Command)
+  - type: static
+    name: titan-os-interface
+    runtime: html
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishDir: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: titan-os-engine
+          property: host
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

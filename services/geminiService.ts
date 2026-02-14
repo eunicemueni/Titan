@@ -1,9 +1,9 @@
-
 import { GoogleGenAI, Type, Modality, GenerateContentResponse, LiveServerMessage } from "@google/genai";
 import { UserProfile } from "../types";
 
-// Detect if we are in production or local dev
-const API_BASE = process.env.VITE_API_URL || '';
+// Detect and sanitize API Base URL for Neural Bridge communication
+const rawBase = process.env.VITE_API_URL || '';
+const API_BASE = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 
 const SYSTEM_INSTRUCTION = `SYSTEM: TITAN OS COMMAND AI.
 IDENTITY: High-level autonomous career operating system.
@@ -339,6 +339,7 @@ export const geminiService = {
       });
       return response.ok;
     } catch (e) {
+      console.error("Uplink dispatch failed:", e);
       return false;
     }
   },
