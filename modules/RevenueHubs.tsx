@@ -86,14 +86,23 @@ const RevenueHubs: React.FC<RevenueHubsProps> = ({ profile, onLog, updateStats, 
     if (!node || node.status === 'SENT') return;
 
     setResults(prev => prev.map(r => r.company === companyName ? { ...r, status: 'ENRICHING' } : r));
-    const email = await geminiService.enrichCompanyEmail(companyName, node.website);
+    
+    // Fix: Replaced non-existent geminiService.enrichCompanyEmail with performDeepEmailScrape
+    let email = "Not Found";
+    try {
+      const domain = new URL(node.website.startsWith('http') ? node.website : `https://${node.website}`).hostname.replace('www.', '');
+      const enrichment = await geminiService.performDeepEmailScrape(companyName, domain);
+      email = enrichment.email;
+    } catch (e) {
+      console.warn("Email enrichment failed, proceeding with name only.");
+    }
     
     setResults(prev => prev.map(r => r.company === companyName ? { ...r, status: 'TAILORING' } : r));
     
     const pitch = await geminiService.generateB2BPitch(companyName, node.gaps, node.solution, profile);
     
     const subject = `[PROPOSAL] ${isAyana ? 'Strategic Growth' : 'Actuarial Risk'} Nexus Implementation: ${node.company}`;
-    const mailtoUrl = `mailto:${email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(pitch || '')}`;
+    const mailtoUrl = `mailto:${email !== 'Not Found' ? email : ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(pitch || '')}`;
     window.open(mailtoUrl, '_blank');
 
     setResults(prev => prev.map(r => r.company === companyName ? { 
@@ -105,7 +114,7 @@ const RevenueHubs: React.FC<RevenueHubsProps> = ({ profile, onLog, updateStats, 
     
     onSent({ 
       type: 'B2B_PITCH', 
-      recipient: email || node.company, 
+      recipient: (email !== 'Not Found' ? email : node.company), 
       subject: subject
     });
 
