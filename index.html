@@ -7,18 +7,31 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Global error capture for mobile debugging
+      // Global shims for libraries that expect a Node-like environment
+      window.process = { 
+        env: { NODE_ENV: 'development' },
+        nextTick: (fn) => setTimeout(fn, 0),
+        browser: true 
+      };
+      window.global = window;
+
+      // Visible error reporter for mobile debugging
       window.onerror = function(msg, url, line, col, error) {
-        // console.log is sometimes hidden on mobile; alert helps identify early crashes
-        console.error("TITAN_BOOT_ERR:", msg, "at", url, ":", line);
+        console.error("TITAN_BOOT_ERR:", msg, url, line);
+        const errDisplay = document.getElementById('boot-error');
+        if (errDisplay) {
+          errDisplay.style.display = 'block';
+          errDisplay.innerHTML = `
+            <div style="color:#ef4444; font-weight:bold; margin-bottom:8px;">CRITICAL_BOOT_FAILURE</div>
+            <div style="font-size:11px; line-height:1.4; opacity:0.8;">${msg}</div>
+            <div style="font-size:10px; margin-top:10px; opacity:0.5; font-family:monospace;">${url}:${line}</div>
+          `;
+        }
         return false;
       };
 
-      // Shim process.env for browser compatibility
-      window.process = window.process || { env: { NODE_ENV: 'development' } };
-      
+      // Custom tailwind config
       tailwind.config = {
-        darkMode: 'class',
         theme: {
           extend: {
             colors: {
@@ -29,100 +42,81 @@
                 primary: '#6366f1',
                 accent: '#a855f7'
               }
-            },
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
             }
           }
         }
-      }
+      };
     </script>
     <style>
         body, html {
-            margin: 0;
-            padding: 0;
+            margin: 0; padding: 0;
             background: #02040a !important;
             color: #f8fafc;
             overflow: hidden;
-            width: 100%;
-            height: 100%;
+            width: 100vw; height: 100vh;
             -webkit-font-smoothing: antialiased;
+            font-family: 'Inter', sans-serif;
             touch-action: manipulation;
         }
-        #root {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            z-index: 1;
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #21262d;
-            border-radius: 10px;
-        }
+        #root { width: 100%; height: 100%; position: relative; z-index: 1; }
         .scanline::before {
             content: " ";
             display: block;
             position: absolute;
             top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%);
             z-index: 9999;
             background-size: 100% 2px;
             pointer-events: none;
             opacity: 0.1;
         }
-        @keyframes pulse-ring {
-          0% { transform: scale(0.8); opacity: 0.5; }
-          50% { transform: scale(1.1); opacity: 0.2; }
-          100% { transform: scale(0.8); opacity: 0.5; }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.3; transform: scale(0.98); }
         }
-        .ring-animate {
-          animation: pulse-ring 3s infinite ease-in-out;
-        }
-        /* Fix for mobile address bar */
-        @supports (-webkit-touch-callout: none) {
-          .h-screen-mobile {
-            height: -webkit-fill-available;
-          }
-        }
+        .boot-pulse { animation: pulse 2.5s infinite ease-in-out; }
     </style>
-<script type="importmap">
+    <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@19.0.0",
     "react/": "https://esm.sh/react@19.0.0/",
     "react-dom": "https://esm.sh/react-dom@19.0.0",
     "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
     "@google/genai": "https://esm.sh/@google/genai@0.3.1",
     "recharts": "https://esm.sh/recharts@2.15.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.0",
-    "@/": "./",
     "express": "https://esm.sh/express@^5.2.1",
+    "http": "https://esm.sh/http@^0.0.1-security",
+    "cors": "https://esm.sh/cors@^2.8.6",
     "path": "https://esm.sh/path@^0.12.7",
+    "url": "https://esm.sh/url@^0.11.4",
+    "bullmq": "https://esm.sh/bullmq@^5.69.1",
+    "ioredis": "https://esm.sh/ioredis@^5.9.3",
     "puppeteer-core": "https://esm.sh/puppeteer-core@^24.37.3",
     "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
-    "http": "https://esm.sh/http@^0.0.1-security",
-    "url": "https://esm.sh/url@^0.11.4",
-    "ioredis": "https://esm.sh/ioredis@^5.9.3",
-    "cors": "https://esm.sh/cors@^2.8.6",
-    "bullmq": "https://esm.sh/bullmq@^5.69.1"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4"
   }
 }
 </script>
 </head>
 <body class="bg-[#02040a] scanline">
+    <div id="boot-error" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:400px; background:#0d1117; border:1px solid #30363d; padding:30px; border-radius:24px; font-family:monospace; z-index:10000; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); color:white;"></div>
+    
     <div id="root">
-      <div style="height: 100%; width: 100%; display: flex; align-items: center; justify-content: center; background: #02040a; color: #333; font-family: monospace; font-size: 10px; letter-spacing: 2px;">
-        INITIALIZING TITAN OS...
+      <div style="height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #02040a; color: #6366f1; font-family: 'JetBrains Mono', monospace;">
+        <div class="boot-pulse" style="display: flex; flex-direction: column; align-items: center;">
+          <div style="font-size: 32px; font-weight: 900; margin-bottom: 20px; font-style: italic; color: #fff; letter-spacing: -1px;">TITAN OS</div>
+          <div id="boot-status" style="font-size: 10px; color: #4b5563; letter-spacing: 4px; font-weight: 700; text-transform: uppercase;">AWAITING_BRIDGE_LINK</div>
+        </div>
       </div>
     </div>
-    <script type="module" src="/index.tsx"></script>
+    
+    <script type="module">
+      const status = document.getElementById('boot-status');
+      if (status) status.innerText = 'ESTABLISHING_NEURAL_LINK';
+    </script>
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
