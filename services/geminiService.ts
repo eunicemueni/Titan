@@ -85,7 +85,7 @@ export const geminiService = {
 
   async performUniversalScrape(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return a list of 8 jobs in valid JSON format with keys: company, role, description, sourceUrl, location. Provide the JSON inside a markdown block.`,
       config: {
@@ -108,7 +108,7 @@ export const geminiService = {
 
   async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, type: string, hiringManager: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Tailor a job application for ${jobTitle} at ${companyName}. Type: ${type}. Manager: ${hiringManager}. Persona: ${JSON.stringify(profile)}.`,
       config: {
@@ -131,7 +131,7 @@ export const geminiService = {
 
   async performDeepEmailScrape(companyName: string, domain: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Search Google for the contact email of a decision maker at ${companyName} (${domain}). Return JSON only: { "email": "string", "personName": "string" }.`,
       config: {
@@ -144,7 +144,7 @@ export const geminiService = {
 
   async analyzeOperationalGaps(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Analyze operational gaps for companies in ${industry} within ${location}. Return a list of JSON objects: company, website, gaps (array), solution, projectedValue (number). Provide JSON in markdown.`,
       config: {
@@ -162,7 +162,7 @@ export const geminiService = {
 
   async getOperationalAudit(prompt: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `${prompt}. Context: ${JSON.stringify(profile)}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
@@ -172,7 +172,7 @@ export const geminiService = {
 
   async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Generate a B2B pitch for ${companyName}. Gaps: ${gaps.join(', ')}. Solution: ${solution}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
@@ -182,7 +182,7 @@ export const geminiService = {
 
   async scoutNexusLeads(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Identify 6 mid-large companies in ${industry} (${location}). Return JSON array with fields: name, website, email, hiringContext.`,
       config: {
@@ -195,7 +195,7 @@ export const geminiService = {
 
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Generate proposal for ${lead.name}. Service: ${service.name}. Context: ${JSON.stringify(profile)}.`,
       config: {
@@ -219,7 +219,7 @@ export const geminiService = {
 
   async processConsoleCommand(command: string, profile: UserProfile): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Execute command: "${command}". Profile: ${JSON.stringify(profile)}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
@@ -229,7 +229,7 @@ export const geminiService = {
 
   async scoutFlashGigs(profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Search Google for active high-velocity freelance gigs matching expertise: ${JSON.stringify(profile.expertiseBlocks)}. Return JSON array.`,
       config: {
@@ -242,7 +242,7 @@ export const geminiService = {
 
   async scoutClientLeads(niche: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Identify 6 agencies or publications in "${niche}". Profile: ${JSON.stringify(profile)}. Return JSON array.`,
       config: {
@@ -255,7 +255,7 @@ export const geminiService = {
 
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Tailor a pitch for ${companyName}. Info: ${description}. Profile: ${JSON.stringify(profile)}.`,
       config: {
@@ -291,8 +291,8 @@ export const geminiService = {
         onopen: () => {
           const source = inputAudioContext.createMediaStreamSource(stream);
           const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
-          scriptProcessor.onaudioprocess = (event) => {
-            const inputData = event.inputBuffer.getChannelData(0);
+          scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
+            const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
             const l = inputData.length;
             const int16 = new Int16Array(l);
             for (let i = 0; i < l; i++) {
@@ -302,7 +302,12 @@ export const geminiService = {
               data: encode(new Uint8Array(int16.buffer)),
               mimeType: 'audio/pcm;rate=16000',
             };
-            activeSessionPromise?.then(session => session.sendRealtimeInput({ media: pcmBlob }));
+            // Solely rely on sessionPromise resolves as per SDK rules
+            if (activeSessionPromise) {
+              activeSessionPromise.then((session) => {
+                session.sendRealtimeInput({ media: pcmBlob });
+              });
+            }
           };
           source.connect(scriptProcessor);
           scriptProcessor.connect(inputAudioContext.destination);
@@ -333,8 +338,8 @@ export const geminiService = {
             nextAudioStartTime = 0;
           }
         },
-        onerror: (e) => console.error("Neural Link Error:", e),
-        onclose: () => console.log("Neural Link Offline")
+        onerror: (e: any) => console.error("Neural Link Error:", e),
+        onclose: (e: any) => console.log("Neural Link Offline")
       },
       config: {
         responseModalities: [Modality.AUDIO],
@@ -348,7 +353,7 @@ export const geminiService = {
 
   async generateVision(prompt: string): Promise<string | undefined> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: { aspectRatio: "16:9" } },
