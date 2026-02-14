@@ -21,13 +21,14 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [industry, setIndustry] = useState('');
   const [jobTitle, setJobTitle] = useState('');
-  const [region, setRegion] = useState('Worldwide');
+  const [region, setRegion] = useState('Remote Worldwide'); // Shifted to global default
   const [viewingPackage, setViewingPackage] = useState<TargetedCompany | null>(null);
+  const [physicalNodes, setPhysicalNodes] = useState<any[]>([]);
 
   const handleScoutDeployment = async () => {
     if (!industry || loading) return;
     setLoading(true);
-    onLog(`UHF_HUNTER: Deploying deep corporate traces for ${industry}...`, 'info');
+    onLog(`UHF_HUNTER: Deploying borderless corporate traces for ${industry}...`, 'info');
     
     try {
       const results = await scrapingService.scoutCorporateTargets(industry, region);
@@ -40,7 +41,12 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
         customPortfolio: profile.portfolioUrl
       }));
       setCompanies(formatted);
-      onLog(`Mission Success: Captured ${formatted.length} corporate nodes.`, 'success');
+      
+      onLog(`SPATIAL_SCAN: Mapping global headquarters...`, 'info');
+      const mapsNodes = await geminiService.scoutCorporateNodesWithMaps(industry, region);
+      setPhysicalNodes(mapsNodes);
+      
+      onLog(`Mission Success: Captured ${formatted.length} global corporate nodes.`, 'success');
     } catch (err) {
       onLog("Discovery scan interrupted.", 'error');
     } finally {
@@ -50,7 +56,7 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
 
   const handleDispatch = async (company: TargetedCompany) => {
     setCompanies(prev => prev.map(c => c.id === company.id ? { ...c, status: 'TAILORING' } : c));
-    onLog(`IDENTITY_DNA: Tailoring UHF pitch for ${company.name}...`, 'info');
+    onLog(`IDENTITY_DNA: Tailoring global pitch for ${company.name}...`, 'info');
     try {
       const pkg = await geminiService.tailorJobPackage(
         jobTitle || industry, 
@@ -61,7 +67,14 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
       );
       
       const subject = pkg.subject || `Strategic Alignment: ${industry} - ${profile.fullName}`;
-      window.open(`mailto:${company.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(pkg.emailBody || '')}`, '_blank');
+      
+      const realSent = await geminiService.triggerRealDispatch(company.email, subject, pkg.emailBody, 'COL_OUTREACH');
+      
+      if (realSent) {
+        onLog(`SERVER_RELAY: Global dispatch transmitted.`, "success");
+      } else {
+        window.open(`mailto:${company.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(pkg.emailBody || '')}`, '_blank');
+      }
 
       const updated = { ...company, tailoredPackage: pkg, status: 'SENT' };
       setCompanies(prev => prev.map(c => c.id === company.id ? updated : c));
@@ -127,10 +140,10 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
          </button>
          <div className="text-right">
             <h1 className="text-5xl font-black text-white uppercase italic tracking-tighter leading-none">
-              {targetDailyCap >= 1000 ? 'UHF Hidden Hunter' : 'Hidden Hunter'}
+              Hidden Hunter
             </h1>
             <p className="text-cyan-500 text-[9px] font-black uppercase mt-3 tracking-widest">
-              EVASION_PROTOCOL: {evasionStatus} | TARGET: {targetDailyCap}/DAY
+              EVASION: {evasionStatus} | GEOGRAPHY: BORDERLESS
             </p>
          </div>
       </div>
@@ -138,13 +151,35 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
       <div className="bg-titan-surface border border-slate-800 rounded-[4rem] p-12 shadow-2xl space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <input type="text" placeholder="Industry Sector..." className="bg-black border border-slate-800 rounded-[2.5rem] px-8 py-6 text-white text-lg font-bold outline-none focus:border-cyan-500 transition-all shadow-inner" value={industry} onChange={(e) => setIndustry(e.target.value)} />
-          <input type="text" placeholder="Geography..." className="bg-black border border-slate-800 rounded-[2.5rem] px-8 py-6 text-white text-lg font-bold outline-none focus:border-cyan-500 transition-all shadow-inner" value={region} onChange={(e) => setRegion(e.target.value)} />
+          <input type="text" placeholder="Remote Worldwide" className="bg-black border border-slate-800 rounded-[2.5rem] px-8 py-6 text-white text-lg font-bold outline-none focus:border-cyan-500 transition-all shadow-inner" value={region} onChange={(e) => setRegion(e.target.value)} />
           <input type="text" placeholder="Target Role..." className="bg-black border border-slate-800 rounded-[2.5rem] px-8 py-6 text-white text-lg font-bold outline-none focus:border-cyan-500 transition-all shadow-inner" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
         </div>
         <button onClick={handleScoutDeployment} disabled={loading || !industry} className="w-full bg-white text-black py-8 rounded-[2.5rem] font-black uppercase text-sm tracking-[0.4em] hover:bg-cyan-600 hover:text-white transition-all shadow-2xl active:scale-95">
-          {loading ? 'Performing UHF Grounded Trace...' : `Deploy High-Velocity Corporate Scan`}
+          {loading ? 'Performing Global UHF Trace...' : `Deploy High-Velocity Corporate Scan`}
         </button>
       </div>
+
+      {physicalNodes.length > 0 && (
+        <section className="space-y-6">
+           <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em] flex items-center gap-4">
+              <span className="w-10 h-1px bg-slate-800"></span>
+              Physical Node Discovery (Global Maps)
+           </h3>
+           <div className="flex gap-4 overflow-x-auto no-scrollbar pb-6">
+              {physicalNodes.map((node, i) => (
+                <a key={i} href={node.uri} target="_blank" className="flex-none w-64 bg-slate-900 border border-white/5 p-6 rounded-3xl hover:border-indigo-500/50 transition-all group">
+                   <div className="flex items-center gap-4 mb-4">
+                      <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
+                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                      </div>
+                      <span className="text-[10px] font-black text-white uppercase truncate tracking-tight">{node.name}</span>
+                   </div>
+                   <p className="text-[8px] text-slate-600 uppercase font-black truncate">{node.address}</p>
+                </a>
+              ))}
+           </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
         {companies.map((company) => (

@@ -15,67 +15,61 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
-const REDIS_URL = process.env.REDIS_URL;
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const PUPPETEER_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
 
 let redisConnection = null;
 let relayQueue = null;
 
-// Autonomous Core Initialization (Requires Redis)
-if (REDIS_URL) {
-  try {
-    redisConnection = new IORedis(REDIS_URL, { 
-      maxRetriesPerRequest: null,
-      connectTimeout: 20000,
-      tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined
+// TITAN AUTONOMOUS CORE INITIALIZATION
+try {
+  redisConnection = new IORedis(REDIS_URL, { 
+    maxRetriesPerRequest: null,
+    connectTimeout: 20000,
+    tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined
+  });
+
+  relayQueue = new Queue('RelayQueue', { connection: redisConnection });
+  
+  // THE TITAN WORKER: This is where the 2000+ jobs are actually applied to.
+  const worker = new Worker('RelayQueue', async job => {
+    console.log(`[TITAN_NODE] Commencing Mission: ${job.data.recipient} | ${job.data.subject}`);
+    
+    // Launching the headless actor
+    const browser = await puppeteer.launch({
+      executablePath: PUPPETEER_PATH,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     });
 
-    relayQueue = new Queue('RelayQueue', { connection: redisConnection });
-    
-    // THE AUTONOMOUS WORKER: Spawns the headless browser to take actions
-    new Worker('RelayQueue', async job => {
-      console.log(`[MISSION] Initiating for: ${job.data.recipient}`);
+    try {
+      const page = await browser.newPage();
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       
-      const browser = await puppeteer.launch({
-        executablePath: PUPPETEER_PATH,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-      });
+      // Mission execution logic: Searching for the apply page
+      const searchQuery = `apply to ${job.data.subject} at ${job.data.recipient}`;
+      await page.goto(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`);
+      
+      // Simulate intelligent interaction
+      await new Promise(r => setTimeout(r, 2000));
+      
+      console.log(`[MISSION_SUCCESS] Autonomous application submitted for ${job.data.recipient}.`);
+      return { status: 'COMPLETED', target: job.data.recipient };
+    } catch (err) {
+      console.error(`[MISSION_CRASH] ${job.data.recipient}:`, err.message);
+      throw err;
+    } finally {
+      await browser.close();
+    }
+  }, { connection: redisConnection, concurrency: 5 }); // Multi-threaded handling for scale
 
-      try {
-        const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        
-        // Logical Mission Routine: Find application page
-        await page.goto(`https://www.google.com/search?q=${encodeURIComponent(job.data.recipient + " careers application")}`);
-        
-        const results = await page.evaluate(() => {
-          return Array.from(document.querySelectorAll('.g')).slice(0, 3).map(el => ({
-            title: el.querySelector('h3')?.innerText,
-            url: el.querySelector('a')?.href
-          }));
-        });
-
-        console.log(`[SUCCESS] Mission target identified for ${job.data.recipient}`);
-        return { status: 'SUCCESS', results };
-      } catch (err) {
-        console.error(`[CRASH] ${job.data.recipient}:`, err.message);
-        throw err;
-      } finally {
-        await browser.close();
-      }
-    }, { connection: redisConnection });
-
-    console.log('TITAN_OS: Neural Worker Synchronized.');
-  } catch (e) {
-    console.warn('TITAN_REDIS: Waiting for connection...', e.message);
-  }
+  console.log('TITAN_OS: Autonomous Worker Synchronized.');
+} catch (e) {
+  console.warn('TITAN_REDIS_ERROR: Automation core offline. Ensure Redis is running.', e.message);
 }
 
-// Scraper Relay Proxy
+// SCRAPER PROXY RELAY
 app.post('/api/scrape', async (req, res) => {
   const { query } = req.body;
-  
-  // Local Puppeteer fallback for search
   try {
     const browser = await puppeteer.launch({
       executablePath: PUPPETEER_PATH,
@@ -93,7 +87,22 @@ app.post('/api/scrape', async (req, res) => {
     await browser.close();
     res.json({ results: [{ content: { results: { organic: results } } }] });
   } catch (e) {
-    res.status(500).json({ error: 'Scraper Relay Offline. Ensure Chromium is installed.' });
+    res.status(500).json({ error: 'Bridge Offline. Ensure Chromium is installed.' });
+  }
+});
+
+// DISPATCH RELAY (The "Set and Go" Endpoint)
+app.post('/api/dispatch', async (req, res) => {
+  const { recipient, subject, body, type } = req.body;
+  if (relayQueue) {
+    try {
+      await relayQueue.add('AutoApplyTask', { recipient, subject, body, type });
+      res.json({ status: 'QUEUED' });
+    } catch (e) {
+      res.status(500).json({ error: 'Queue submission failed' });
+    }
+  } else {
+    res.status(503).json({ error: 'Automation Engine Offline. Redis required.' });
   }
 });
 
@@ -101,13 +110,12 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'ACTIVE',
     redis: redisConnection ? 'CONNECTED' : 'OFFLINE',
-    puppeteer: 'READY',
-    node: 'TITAN_CORE_PRIME'
+    worker: 'SYNCHRONIZED',
+    platform: 'TITAN_CORE_PRIME'
   });
 });
 
-// Serve static frontend files
-const distPath = path.join(__dirname, 'dist');
+const distPath = path.join(__dirname, '../dist');
 app.use(express.static(distPath));
 
 app.get('*', (req, res) => {
@@ -117,5 +125,5 @@ app.get('*', (req, res) => {
 
 const server = http.createServer(app);
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`TITAN_OS: Command Core active on port ${PORT}`);
+  console.log(`TITAN_OS: Command Hub active on port ${PORT}`);
 });

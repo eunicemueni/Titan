@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { JobRecord, UserProfile, TelemetryLog, SentRecord } from '../types';
 import { geminiService } from '../services/geminiService';
@@ -22,7 +23,8 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
   const [showSwipe, setShowSwipe] = useState(false);
   
   const [query, setQuery] = useState('');
-  const [location, setLocation] = useState('USA Remote-Only');
+  // Corrected: Shifted from regional to Remote Worldwide default
+  const [location, setLocation] = useState('Remote Worldwide');
 
   const visibleJobs = useMemo(() => jobs.filter(j => j.status === 'discovered'), [jobs]);
   const allSelected = visibleJobs.length > 0 && Array.from(selectedIds).length >= visibleJobs.length;
@@ -47,7 +49,7 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
   const handleGlobalScrape = async () => {
     if (!query) return;
     setIsScanning(true);
-    onLog(`SCAN: Targeting ${query} nodes...`, 'info');
+    onLog(`SCAN: Targeting ${query} nodes (Global Uplink)...`, 'info');
     
     try {
       const results = await geminiService.performUniversalScrape(query, location);
@@ -89,17 +91,17 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
          </button>
          <div className="text-left md:text-right">
             <h1 className="text-3xl md:text-6xl font-black text-white italic tracking-tighter uppercase leading-none">Neural Scanner</h1>
-            <p className="text-amber-500 text-[8px] md:text-[10px] font-black uppercase tracking-[0.4em] mt-1 md:mt-2">GROUNDING_ENABLED: UHF_MODE</p>
+            <p className="text-amber-500 text-[8px] md:text-[10px] font-black uppercase tracking-[0.4em] mt-1 md:mt-2">GROUNDING_ENABLED: BORDERLESS_UHF</p>
          </div>
       </div>
 
       <div className="bg-slate-950 border border-amber-500/10 rounded-3xl md:rounded-[4rem] p-6 md:p-16 shadow-2xl space-y-6 md:space-y-12">
          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10">
            <input type="text" placeholder="Role (e.g. Data Analyst)..." className="w-full bg-black border border-white/5 rounded-2xl md:rounded-[2.5rem] px-6 py-4 md:px-10 md:py-6 text-white text-sm md:text-xl font-black outline-none focus:border-amber-500 transition-all" value={query} onChange={(e) => setQuery(e.target.value)} />
-           <input type="text" className="w-full bg-black border border-white/5 rounded-2xl md:rounded-[2.5rem] px-6 py-4 md:px-10 md:py-6 text-white text-sm md:text-xl font-black outline-none focus:border-amber-500 transition-all" value={location} onChange={(e) => setLocation(e.target.value)} />
+           <input type="text" placeholder="Remote Worldwide" className="w-full bg-black border border-white/5 rounded-2xl md:rounded-[2.5rem] px-6 py-4 md:px-10 md:py-6 text-white text-sm md:text-xl font-black outline-none focus:border-amber-500 transition-all" value={location} onChange={(e) => setLocation(e.target.value)} />
          </div>
          <button onClick={handleGlobalScrape} disabled={isScanning} className="w-full py-6 md:py-10 bg-white text-black rounded-2xl md:rounded-[2.5rem] font-black uppercase text-[10px] md:text-lg tracking-[0.4em] hover:bg-amber-500 transition-all">
-           {isScanning ? 'SYNCING...' : 'Universal Scan'}
+           {isScanning ? 'SYNCING GLOBAL NODES...' : 'Universal Scan'}
          </button>
       </div>
 
@@ -134,10 +136,9 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
                 <div className="bg-black/60 border border-white/5 rounded-2xl md:rounded-[3rem] p-4 md:p-8 min-h-[80px] md:min-h-[140px] flex flex-col mb-4 md:mb-8">
                    <p className="text-[9px] md:text-xs text-slate-500 italic leading-relaxed font-bold uppercase tracking-tight line-clamp-3 mb-4">{job.description}</p>
                    
-                   {/* Grounding Source Relays */}
                    {job.metadata?.sources && job.metadata.sources.length > 0 && (
                      <div className="mt-auto space-y-2 border-t border-white/5 pt-3">
-                        <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Grounding Relays:</p>
+                        <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Global Relays:</p>
                         <div className="flex flex-wrap gap-2">
                           {job.metadata.sources.slice(0, 2).map((src: any, idx: number) => (
                             <a 
@@ -167,7 +168,7 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
 
       {showSwipe && (
         <SwipeDeploy 
-          label={`${selectedIds.size} Node Dispatches`}
+          label={`${selectedIds.size} Global Dispatches`}
           onConfirm={handleMassQueue}
           onCancel={() => setShowSwipe(false)}
           themeColor="amber"

@@ -29,6 +29,8 @@ export interface AppAnalytics {
   totalIncome: number;
   lastPulse: number;
   activeLeads: number;
+  conversionRate: number;
+  concurrencyNodeCount: number;
 }
 
 export interface UserProfile {
@@ -55,11 +57,11 @@ export interface UserProfile {
 }
 
 export interface Mission {
-  id: IndustryType;
-  status: 'IDLE' | 'SCANNING' | 'SCRAPING_EMAILS' | 'DISPATCHING' | 'COMPLETED';
-  lastRun: number;
-  totalFound: number;
-  currentTask?: string;
+  id: string;
+  target: string;
+  status: 'PENDING' | 'ACTIVE' | 'SUCCESS' | 'FAILURE';
+  log: string;
+  timestamp: number;
 }
 
 export interface JobRecord {
@@ -82,7 +84,6 @@ export interface JobRecord {
     emailBody: string;
     subject: string;
   };
-  // Fix: Added metadata field to support grounding source storage
   metadata?: {
     sources?: { title: string; uri: string }[];
     [key: string]: any;
@@ -134,7 +135,7 @@ export interface SentRecord {
   timestamp: number;
   status: PipelineStatus;
   industry?: IndustryType;
-  payload?: string; // New field for viewing content in ledger
+  payload?: string;
 }
 
 export interface TelemetryLog {
