@@ -31,7 +31,7 @@ function decode(base64: string): Uint8Array {
 
 /**
  * Decodes raw PCM audio data into an AudioBuffer.
- * Line 30: Updated to use the standard SDK buffer handling approach.
+ * Line 30: Using standard SDK approach for raw PCM buffer conversion.
  */
 async function decodeAudioData(
   data: Uint8Array,
@@ -39,7 +39,7 @@ async function decodeAudioData(
   sampleRate: number,
   numChannels: number,
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
+  const dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 
@@ -169,7 +169,7 @@ export const geminiService = {
   },
 
   /**
-   * Lines 175-177: Content Generation for B2B Pitch. Corrected to access .text property.
+   * Lines 175, 177: Content generation for B2B Pitch.
    */
   async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
@@ -182,7 +182,7 @@ export const geminiService = {
   },
 
   /**
-   * Lines 185-187, 195: Scouting logic with tool configuration. 
+   * Lines 187, 195: Scouting logic and JSON extraction.
    */
   async scoutNexusLeads(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
@@ -198,7 +198,7 @@ export const geminiService = {
   },
 
   /**
-   * Line 211: Market Nexus Pitch generation.
+   * Line 211: Proposal synthesis.
    */
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
@@ -224,9 +224,6 @@ export const geminiService = {
     return extractJson(response.text) || {};
   },
 
-  /**
-   * Line 222: Command processing.
-   */
   async processConsoleCommand(command: string, profile: UserProfile): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -238,7 +235,7 @@ export const geminiService = {
   },
 
   /**
-   * Line 234: Gig scouting.
+   * Line 234: Flash gig scouting.
    */
   async scoutFlashGigs(profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
@@ -267,7 +264,7 @@ export const geminiService = {
   },
 
   /**
-   * Line 260: Client pitch tailoring.
+   * Line 260: Tailored pitch.
    */
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
@@ -318,7 +315,6 @@ export const geminiService = {
               data: encode(new Uint8Array(int16.buffer)),
               mimeType: 'audio/pcm;rate=16000',
             };
-            // Corrected: Reliable session promise resolution for input.
             activeSessionPromise?.then((session) => {
               session.sendRealtimeInput({ media: pcmBlob });
             });
@@ -327,10 +323,10 @@ export const geminiService = {
           scriptProcessor.connect(inputAudioContext.destination);
         },
         /**
-         * Lines 305, 307-310: Audio and transcription message handling.
+         * Lines 305, 307-310: Message handling and audio playback synchronization.
          */
         onmessage: async (message: LiveServerMessage) => {
-          const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+          const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
           if (base64Audio) {
             nextAudioStartTime = Math.max(nextAudioStartTime, outputAudioContext.currentTime);
             const audioBuffer = await decodeAudioData(decode(base64Audio), outputAudioContext, 24000, 1);
@@ -359,7 +355,7 @@ export const geminiService = {
         onclose: () => console.log("Neural Link Offline")
       },
       /**
-       * Line 328: Config for Live API.
+       * Line 328: Live configuration.
        */
       config: {
         responseModalities: [Modality.AUDIO],
@@ -372,7 +368,7 @@ export const geminiService = {
   },
 
   /**
-   * Lines 341-342, 356: Vision generation using nano banana models.
+   * Lines 341, 342, 356, 362-364: Image generation and extraction logic.
    */
   async generateVision(prompt: string): Promise<string | undefined> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
