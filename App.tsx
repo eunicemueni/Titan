@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord, AppAnalytics, TargetedCompany } from './types';
+import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord, AppAnalytics } from './types';
 import Dashboard from './modules/Dashboard';
 import MissionControl from './modules/MissionControl';
 import ScraperNode from './modules/JobAutopilot';
@@ -116,23 +116,27 @@ const App: React.FC = () => {
   useEffect(() => {
     const hydrate = async () => {
       addLog("UPLINK: Synchronizing with Global Cloud Node...", "info");
-      const [cloudJobs, cloudSent, cloudProfiles] = await Promise.all([
-        supabaseService.loadJobs(),
-        supabaseService.loadSentRecords(),
-        supabaseService.loadProfiles()
-      ]);
+      try {
+        const [cloudJobs, cloudSent, cloudProfiles] = await Promise.all([
+          supabaseService.loadJobs(),
+          supabaseService.loadSentRecords(),
+          supabaseService.loadProfiles()
+        ]);
 
-      if (cloudJobs) setJobs(cloudJobs);
-      if (cloudSent) setSentRecords(cloudSent);
-      if (cloudProfiles && cloudProfiles.length > 0) {
-        setProfiles(cloudProfiles);
-        addLog("IDENTITY: Global DNA synchronized from Supabase.", "success");
-      } else {
-        addLog("IDENTITY: Using Local DNA fallbacks (Hardcoded).", "warning");
+        if (cloudJobs) setJobs(cloudJobs);
+        if (cloudSent) setSentRecords(cloudSent);
+        if (cloudProfiles && cloudProfiles.length > 0) {
+          setProfiles(cloudProfiles);
+          addLog("IDENTITY: Global DNA synchronized from Supabase.", "success");
+        } else {
+          addLog("IDENTITY: Using Local DNA fallbacks (Hardcoded).", "warning");
+        }
+      } catch (err) {
+        addLog("UPLINK: Synchronization Error. Using local state.", "error");
       }
     };
     hydrate();
-  }, []);
+  }, [addLog]);
 
   const currentProfile = useMemo(() => profiles[activeIndex] || profiles[0], [profiles, activeIndex]);
 
