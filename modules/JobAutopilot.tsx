@@ -51,7 +51,7 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
     
     try {
       const results = await geminiService.performUniversalScrape(query, location);
-      const mapped: JobRecord[] = results.map((j: any, i: number) => ({
+      const mapped: (JobRecord & { metadata?: any })[] = results.map((j: any, i: number) => ({
         id: `gem-${Date.now()}-${i}`,
         company: j.company || "Target",
         role: j.role || query,
@@ -60,11 +60,12 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
         sourceUrl: j.sourceUrl || "",
         status: 'discovered' as const,
         timestamp: Date.now(),
-        matchScore: 90 + Math.floor(Math.random() * 10)
+        matchScore: 90 + Math.floor(Math.random() * 10),
+        metadata: j.metadata
       }));
 
       setJobs(prev => [...mapped, ...prev].slice(0, 200));
-      onLog(`Captured ${mapped.length} nodes.`, 'success');
+      onLog(`Captured ${mapped.length} nodes via Gemini Grounding.`, 'success');
     } catch (err: any) { 
       onLog("Scan bypassed.", "warning"); 
     } finally { 
@@ -88,7 +89,7 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
          </button>
          <div className="text-left md:text-right">
             <h1 className="text-3xl md:text-6xl font-black text-white italic tracking-tighter uppercase leading-none">Neural Scanner</h1>
-            <p className="text-amber-500 text-[8px] md:text-[10px] font-black uppercase tracking-[0.4em] mt-1 md:mt-2">UHF_MODE: ENABLED</p>
+            <p className="text-amber-500 text-[8px] md:text-[10px] font-black uppercase tracking-[0.4em] mt-1 md:mt-2">GROUNDING_ENABLED: UHF_MODE</p>
          </div>
       </div>
 
@@ -120,8 +121,8 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10">
-          {visibleJobs.map(job => (
-            <div key={job.id} onClick={() => toggleSelect(job.id)} className={`p-6 md:p-12 rounded-3xl md:rounded-[4.5rem] border transition-all duration-300 flex flex-col justify-between min-h-[300px] md:min-h-[480px] relative group cursor-pointer ${selectedIds.has(job.id) ? 'border-amber-500 bg-amber-500/5' : 'border-white/5 bg-slate-950 hover:border-white/20'}`}>
+          {visibleJobs.map((job: any) => (
+            <div key={job.id} onClick={() => toggleSelect(job.id)} className={`p-6 md:p-12 rounded-3xl md:rounded-[4.5rem] border transition-all duration-300 flex flex-col justify-between min-h-[350px] md:min-h-[520px] relative group cursor-pointer ${selectedIds.has(job.id) ? 'border-amber-500 bg-amber-500/5' : 'border-white/5 bg-slate-950 hover:border-white/20'}`}>
               <div className="absolute top-6 right-6 md:top-10 md:right-10">
                  <div className={`w-6 h-6 md:w-8 md:h-8 rounded-lg md:rounded-2xl border-2 transition-all flex items-center justify-center ${selectedIds.has(job.id) ? 'bg-amber-600 border-amber-600' : 'border-white/10'}`}>
                     {selectedIds.has(job.id) && <svg className="w-4 h-4 md:w-5 md:h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7"/></svg>}
@@ -130,8 +131,29 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
               <div>
                 <h4 className="font-black text-white text-xl md:text-3xl italic tracking-tighter leading-tight mb-1 md:mb-2 uppercase group-hover:text-amber-500 transition-colors">{job.role}</h4>
                 <p className="text-[8px] md:text-[11px] text-slate-600 font-black uppercase tracking-widest mb-4 md:mb-10">{job.company}</p>
-                <div className="bg-black/60 border border-white/5 rounded-2xl md:rounded-[3rem] p-4 md:p-10 min-h-[80px] md:min-h-[160px] flex items-center mb-4 md:mb-8">
-                   <p className="text-[9px] md:text-xs text-slate-500 italic leading-relaxed font-bold uppercase tracking-tight line-clamp-3">{job.description}</p>
+                <div className="bg-black/60 border border-white/5 rounded-2xl md:rounded-[3rem] p-4 md:p-8 min-h-[80px] md:min-h-[140px] flex flex-col mb-4 md:mb-8">
+                   <p className="text-[9px] md:text-xs text-slate-500 italic leading-relaxed font-bold uppercase tracking-tight line-clamp-3 mb-4">{job.description}</p>
+                   
+                   {/* Grounding Source Relays */}
+                   {job.metadata?.sources && job.metadata.sources.length > 0 && (
+                     <div className="mt-auto space-y-2 border-t border-white/5 pt-3">
+                        <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Grounding Relays:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {job.metadata.sources.slice(0, 2).map((src: any, idx: number) => (
+                            <a 
+                              key={idx} 
+                              href={src.uri} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[7px] font-mono text-slate-600 hover:text-white transition-colors underline truncate max-w-[120px]"
+                            >
+                              {src.title}
+                            </a>
+                          ))}
+                        </div>
+                     </div>
+                   )}
                 </div>
               </div>
               <div className="mt-4 md:mt-10 flex items-center justify-between border-t border-white/5 pt-4 md:pt-8">

@@ -82,6 +82,11 @@ export interface JobRecord {
     emailBody: string;
     subject: string;
   };
+  // Fix: Added metadata field to support grounding source storage
+  metadata?: {
+    sources?: { title: string; uri: string }[];
+    [key: string]: any;
+  };
 }
 
 export interface TargetedCompany {

@@ -4,8 +4,8 @@ import { UserProfile } from "../types";
 const SYSTEM_INSTRUCTION = `SYSTEM: TITAN OS COMMAND AI.
 IDENTITY: High-level autonomous career operating system.
 GOAL: Maximize user revenue via 100% remote strategic nodes.
-CORE PERSO_DNA: Professional, authoritative, efficient.
-RULES: Use Google Search grounding for recent market data. When using search, return information clearly and include factual URLs where available from the grounding metadata.`;
+CORE DNA: Professional, authoritative, efficient.
+RULES: Use Google Search grounding for recent market data. You must return information clearly and assume URLs from grounding metadata will be displayed to the user.`;
 
 function encode(bytes: Uint8Array): string {
   let binary = '';
@@ -79,10 +79,21 @@ export const geminiService = {
         tools: [{ googleSearch: {} }]
       }
     });
+    
     const results = extractJson(response.text) || [];
+    // Mandatory extraction of grounding sources
     const groundingSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    const sourceUrls = groundingSources.filter(chunk => chunk.web?.uri).map(chunk => ({ title: chunk.web?.title, uri: chunk.web?.uri }));
-    return results.map((job: any) => ({ ...job, metadata: { sources: sourceUrls } }));
+    const sourceUrls = groundingSources
+      .filter(chunk => chunk.web?.uri)
+      .map(chunk => ({ 
+        title: chunk.web?.title || "Search Source", 
+        uri: chunk.web?.uri 
+      }));
+
+    return results.map((job: any) => ({ 
+      ...job, 
+      metadata: { sources: sourceUrls } 
+    }));
   },
 
   async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, type: string, hiringManager: string) {
@@ -149,16 +160,6 @@ export const geminiService = {
     return response.text || "";
   },
 
-  async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Generate B2B pitch for ${companyName}. Gaps: ${gaps.join(', ')}. Solution: ${solution}.`,
-      config: { systemInstruction: SYSTEM_INSTRUCTION }
-    });
-    return response.text || "";
-  },
-
   async scoutNexusLeads(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -170,30 +171,6 @@ export const geminiService = {
       }
     });
     return extractJson(response.text) || [];
-  },
-
-  async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `Generate proposal for ${lead.name}. Service: ${service.name}. Context: ${JSON.stringify(profile)}.`,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            subject: { type: Type.STRING },
-            executiveSummary: { type: Type.STRING },
-            implementationPhases: { type: Type.STRING },
-            valueProjection: { type: Type.STRING },
-            emailBody: { type: Type.STRING }
-          },
-          required: ["subject", "executiveSummary", "implementationPhases", "valueProjection", "emailBody"]
-        }
-      }
-    });
-    return extractJson(response.text) || {};
   },
 
   async processConsoleCommand(command: string, profile: UserProfile): Promise<string> {
@@ -219,11 +196,50 @@ export const geminiService = {
     return extractJson(response.text) || [];
   },
 
+  // Fix: Added generateB2BPitch to satisfy RevenueHubs.tsx
+  async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Generate a professional B2B sales pitch for ${companyName}. Logic Gaps: ${gaps.join(', ')}. Proposed Solution: ${solution}. Consultant Persona: ${JSON.stringify(profile)}. Output should be direct and high-authority.`,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+      }
+    });
+    return response.text;
+  },
+
+  // Fix: Added generateMarketNexusPitch to satisfy MarketNexus.tsx
+  async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Generate a high-end corporate proposal for ${lead.name} for the asset "${service.name}". Price point: $${service.price}. Hiring Context: ${lead.hiringContext}. Consultant Persona: ${JSON.stringify(profile)}.`,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            subject: { type: Type.STRING },
+            executiveSummary: { type: Type.STRING },
+            implementationPhases: { type: Type.STRING },
+            valueProjection: { type: Type.STRING },
+            emailBody: { type: Type.STRING },
+          },
+          required: ["subject", "executiveSummary", "implementationPhases", "valueProjection", "emailBody"]
+        }
+      }
+    });
+    return extractJson(response.text) || {};
+  },
+
+  // Fix: Added scoutClientLeads to satisfy ClientNexus.tsx
   async scoutClientLeads(niche: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Identify 6 agencies or publications in "${niche}". Profile: ${JSON.stringify(profile)}. Return JSON array.`,
+      contents: `Scout for 8 high-intent client leads (agencies, publications, firms) in the niche "${niche}". User background: ${JSON.stringify(profile.expertiseBlocks)}. Return valid JSON array with keys: companyName, website, description, type (one of PUBLICATION, AGENCY, OTHER), opportunityScore (1-100).`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -232,11 +248,12 @@ export const geminiService = {
     return extractJson(response.text) || [];
   },
 
+  // Fix: Added tailorClientPitch to satisfy ClientNexus.tsx
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `Tailor pitch for ${companyName}. Info: ${description}. Profile: ${JSON.stringify(profile)}.`,
+      model: 'gemini-3-flash-preview',
+      contents: `Tailor a cold outreach pitch for ${companyName}. Opportunity: ${description}. Consultant Persona: ${JSON.stringify(profile)}. Strategy should bypass procurement friction.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
@@ -245,7 +262,7 @@ export const geminiService = {
           properties: {
             subject: { type: Type.STRING },
             body: { type: Type.STRING },
-            contactPersonStrategy: { type: Type.STRING }
+            contactPersonStrategy: { type: Type.STRING },
           },
           required: ["subject", "body", "contactPersonStrategy"]
         }
@@ -261,6 +278,7 @@ export const geminiService = {
     const outputNode = outputAudioContext.createGain();
     outputNode.connect(outputAudioContext.destination);
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
     activeSessionPromise = ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-12-2025',
       callbacks: {

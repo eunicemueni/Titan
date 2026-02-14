@@ -7,6 +7,16 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      // Global error capture for mobile debugging
+      window.onerror = function(msg, url, line, col, error) {
+        // console.log is sometimes hidden on mobile; alert helps identify early crashes
+        console.error("TITAN_BOOT_ERR:", msg, "at", url, ":", line);
+        return false;
+      };
+
+      // Shim process.env for browser compatibility
+      window.process = window.process || { env: { NODE_ENV: 'development' } };
+      
       tailwind.config = {
         darkMode: 'class',
         theme: {
@@ -35,10 +45,10 @@
             background: #02040a !important;
             color: #f8fafc;
             overflow: hidden;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             -webkit-font-smoothing: antialiased;
-            touch-action: pan-y;
+            touch-action: manipulation;
         }
         #root {
             width: 100%;
@@ -75,6 +85,12 @@
         .ring-animate {
           animation: pulse-ring 3s infinite ease-in-out;
         }
+        /* Fix for mobile address bar */
+        @supports (-webkit-touch-callout: none) {
+          .h-screen-mobile {
+            height: -webkit-fill-available;
+          }
+        }
     </style>
 <script type="importmap">
 {
@@ -86,23 +102,27 @@
     "@google/genai": "https://esm.sh/@google/genai@0.3.1",
     "recharts": "https://esm.sh/recharts@2.15.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.0",
+    "@/": "./",
     "express": "https://esm.sh/express@^5.2.1",
-    "http": "https://esm.sh/http@^0.0.1-security",
-    "cors": "https://esm.sh/cors@^2.8.6",
     "path": "https://esm.sh/path@^0.12.7",
-    "url": "https://esm.sh/url@^0.11.4",
-    "bullmq": "https://esm.sh/bullmq@^5.68.0",
-    "ioredis": "https://esm.sh/ioredis@^5.4.1",
-    "puppeteer-core": "https://esm.sh/puppeteer-core@^24.1.1",
+    "puppeteer-core": "https://esm.sh/puppeteer-core@^24.37.3",
     "vite": "https://esm.sh/vite@^7.3.1",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
-    "@/": "../"
+    "http": "https://esm.sh/http@^0.0.1-security",
+    "url": "https://esm.sh/url@^0.11.4",
+    "ioredis": "https://esm.sh/ioredis@^5.9.3",
+    "cors": "https://esm.sh/cors@^2.8.6",
+    "bullmq": "https://esm.sh/bullmq@^5.69.1"
   }
 }
 </script>
 </head>
 <body class="bg-[#02040a] scanline">
-    <div id="root"></div>
+    <div id="root">
+      <div style="height: 100%; width: 100%; display: flex; align-items: center; justify-content: center; background: #02040a; color: #333; font-family: monospace; font-size: 10px; letter-spacing: 2px;">
+        INITIALIZING TITAN OS...
+      </div>
+    </div>
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>
