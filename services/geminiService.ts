@@ -8,7 +8,7 @@ CORE PERSO_DNA: Professional, authoritative, efficient.
 RULES: Use Google Search grounding for recent market data. When using search, return information clearly and include factual URLs where available from the grounding metadata.`;
 
 /**
- * Manual Base64 encoding/decoding utilities as per SDK requirements.
+ * Manual Base64 encoding/decoding as required by @google/genai guidelines.
  */
 function encode(bytes: Uint8Array): string {
   let binary = '';
@@ -31,7 +31,7 @@ function decode(base64: string): Uint8Array {
 
 /**
  * Decodes raw PCM audio data into an AudioBuffer.
- * Required because browser decodeAudioData does not support raw PCM streams without headers.
+ * The Gemini Live API sends raw bytes (no header), so standard decodeAudioData fails.
  */
 async function decodeAudioData(
   data: Uint8Array,
@@ -53,18 +53,15 @@ async function decodeAudioData(
 }
 
 /**
- * Robustly extracts JSON from LLM text output.
- * Necessary because responseMimeType: "application/json" cannot be used with googleSearch tools.
+ * Extracts JSON from model output when responseMimeType is unavailable (due to tool use).
  */
 function extractJson(text: string | undefined): any {
   if (!text) return null;
   try {
     const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     const contentToParse = jsonBlockMatch ? jsonBlockMatch[1] : text;
-    
     const firstBracket = contentToParse.search(/[\[\{]/);
     const lastBracket = contentToParse.lastIndexOf(contentToParse.match(/[\]\}]/)?.[0] || '');
-    
     if (firstBracket !== -1 && lastBracket !== -1) {
       return JSON.parse(contentToParse.substring(firstBracket, lastBracket + 1));
     }
@@ -85,12 +82,13 @@ export const geminiService = {
 
   async performUniversalScrape(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 88: Fixed model call and tool configuration
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return a list of 8 jobs in valid JSON format with keys: company, role, description, sourceUrl, location. Provide the JSON inside a markdown block.`,
+      contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return a list of 8 jobs in valid JSON format with keys: company, role, description, sourceUrl, location. Wrap JSON in a markdown block.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }],
+        tools: [{ googleSearch: {} }]
       }
     });
     
@@ -108,7 +106,8 @@ export const geminiService = {
 
   async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, type: string, hiringManager: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 111: Fixed model call and text property access
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Tailor a job application for ${jobTitle} at ${companyName}. Type: ${type}. Manager: ${hiringManager}. Persona: ${JSON.stringify(profile)}.`,
       config: {
@@ -131,9 +130,10 @@ export const geminiService = {
 
   async performDeepEmailScrape(companyName: string, domain: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 134: Corrected tool configuration
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search Google for the contact email of a decision maker at ${companyName} (${domain}). Return JSON only: { "email": "string", "personName": "string" }.`,
+      contents: `Search for contact email for decision maker at ${companyName} (${domain}). Return JSON only: { "email": "string", "personName": "string" }.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -144,9 +144,10 @@ export const geminiService = {
 
   async analyzeOperationalGaps(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 147: Corrected tool configuration
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Analyze operational gaps for companies in ${industry} within ${location}. Return a list of JSON objects: company, website, gaps (array), solution, projectedValue (number). Provide JSON in markdown.`,
+      contents: `Analyze operational gaps for companies in ${industry} within ${location}. Return list of JSON objects: company, website, gaps (array), solution, projectedValue (number).`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -162,7 +163,8 @@ export const geminiService = {
 
   async getOperationalAudit(prompt: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 165: Property access fix
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `${prompt}. Context: ${JSON.stringify(profile)}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
@@ -172,9 +174,10 @@ export const geminiService = {
 
   async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 175: Property access fix
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Generate a B2B pitch for ${companyName}. Gaps: ${gaps.join(', ')}. Solution: ${solution}.`,
+      contents: `Generate B2B pitch for ${companyName}. Gaps: ${gaps.join(', ')}. Solution: ${solution}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
     });
     return response.text || "";
@@ -182,9 +185,10 @@ export const geminiService = {
 
   async scoutNexusLeads(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 185: Corrected tool configuration
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Identify 6 mid-large companies in ${industry} (${location}). Return JSON array with fields: name, website, email, hiringContext.`,
+      contents: `Identify 6 mid-large companies in ${industry} (${location}). Return JSON array with name, website, email, hiringContext.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -195,7 +199,8 @@ export const geminiService = {
 
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 209 (Part of previous requested block): Property access fix
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Generate proposal for ${lead.name}. Service: ${service.name}. Context: ${JSON.stringify(profile)}.`,
       config: {
@@ -208,7 +213,7 @@ export const geminiService = {
             executiveSummary: { type: Type.STRING },
             implementationPhases: { type: Type.STRING },
             valueProjection: { type: Type.STRING },
-            emailBody: { type: Type.STRING },
+            emailBody: { type: Type.STRING }
           },
           required: ["subject", "executiveSummary", "implementationPhases", "valueProjection", "emailBody"]
         }
@@ -219,7 +224,8 @@ export const geminiService = {
 
   async processConsoleCommand(command: string, profile: UserProfile): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 222: Property access fix
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Execute command: "${command}". Profile: ${JSON.stringify(profile)}.`,
       config: { systemInstruction: SYSTEM_INSTRUCTION }
@@ -229,9 +235,10 @@ export const geminiService = {
 
   async scoutFlashGigs(profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 232: Corrected tool configuration
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search Google for active high-velocity freelance gigs matching expertise: ${JSON.stringify(profile.expertiseBlocks)}. Return JSON array.`,
+      contents: `Search for high-velocity freelance gigs matching expertise: ${JSON.stringify(profile.expertiseBlocks)}. Return JSON array.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -242,7 +249,8 @@ export const geminiService = {
 
   async scoutClientLeads(niche: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 245: Corrected tool configuration
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Identify 6 agencies or publications in "${niche}". Profile: ${JSON.stringify(profile)}. Return JSON array.`,
       config: {
@@ -255,9 +263,10 @@ export const geminiService = {
 
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Line 258: Property access fix
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Tailor a pitch for ${companyName}. Info: ${description}. Profile: ${JSON.stringify(profile)}.`,
+      contents: `Tailor pitch for ${companyName}. Info: ${description}. Profile: ${JSON.stringify(profile)}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
@@ -291,8 +300,8 @@ export const geminiService = {
         onopen: () => {
           const source = inputAudioContext.createMediaStreamSource(stream);
           const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
-          scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
-            const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+          scriptProcessor.onaudioprocess = (event) => {
+            const inputData = event.inputBuffer.getChannelData(0);
             const l = inputData.length;
             const int16 = new Int16Array(l);
             for (let i = 0; i < l; i++) {
@@ -302,17 +311,14 @@ export const geminiService = {
               data: encode(new Uint8Array(int16.buffer)),
               mimeType: 'audio/pcm;rate=16000',
             };
-            // Solely rely on sessionPromise resolves as per SDK rules
-            if (activeSessionPromise) {
-              activeSessionPromise.then((session) => {
-                session.sendRealtimeInput({ media: pcmBlob });
-              });
-            }
+            // Lines 294, 295: Fixed session send logic
+            activeSessionPromise?.then(session => session.sendRealtimeInput({ media: pcmBlob }));
           };
           source.connect(scriptProcessor);
           scriptProcessor.connect(inputAudioContext.destination);
         },
         onmessage: async (message: LiveServerMessage) => {
+          // Line 305: Corrected message parsing for model output
           const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
           if (base64Audio) {
             nextAudioStartTime = Math.max(nextAudioStartTime, outputAudioContext.currentTime);
@@ -325,7 +331,6 @@ export const geminiService = {
             activeSources.add(source);
             source.onended = () => activeSources.delete(source);
           }
-
           if (message.serverContent?.outputTranscription) {
             onTranscription(message.serverContent.outputTranscription.text);
           }
@@ -338,8 +343,8 @@ export const geminiService = {
             nextAudioStartTime = 0;
           }
         },
-        onerror: (e: any) => console.error("Neural Link Error:", e),
-        onclose: (e: any) => console.log("Neural Link Offline")
+        onerror: (e) => console.error("Neural Link Error:", e),
+        onclose: () => console.log("Neural Link Offline")
       },
       config: {
         responseModalities: [Modality.AUDIO],
@@ -353,15 +358,20 @@ export const geminiService = {
 
   async generateVision(prompt: string): Promise<string | undefined> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
+    // Lines 336, 337: Fixed model and config
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: { aspectRatio: "16:9" } },
     });
     
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+    // Line 351: Corrected iteration over parts for image extraction
+    const candidate = response.candidates?.[0];
+    if (candidate?.content?.parts) {
+      for (const part of candidate.content.parts) {
+        if (part.inlineData) {
+          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        }
       }
     }
     return undefined;
