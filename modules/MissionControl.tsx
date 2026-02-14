@@ -4,24 +4,37 @@ import { UserProfile, JobRecord, Mission, TelemetryLog, QueueStatus, SentRecord 
 
 interface MissionControlProps {
   profile: UserProfile;
-  jobs: JobRecord[];
-  sentRecords: SentRecord[];
-  setJobs: React.Dispatch<React.SetStateAction<JobRecord[]>>;
   onLog: (msg: string, level: TelemetryLog['level']) => void;
-  onSent: (r: any) => void;
+  onSent: (record: Omit<SentRecord, 'id' | 'timestamp' | 'status'>) => void;
+  onBack: () => void;
+  jobs: JobRecord[];
+  setJobs: React.Dispatch<React.SetStateAction<JobRecord[]>>;
   isAutopilot: boolean;
   onToggleAutopilot: () => void;
-  missions: Mission[];
+  sentRecords: SentRecord[];
   queueStatus: QueueStatus;
   targetDailyCap: number;
   evasionStatus: string;
+  missions: Mission[];
 }
 
 const MissionControl: React.FC<MissionControlProps> = ({ 
-  profile, jobs, sentRecords, setJobs, onLog, isAutopilot, onToggleAutopilot, targetDailyCap 
+  profile, 
+  onLog, 
+  onSent,
+  onBack,
+  jobs, 
+  setJobs, 
+  isAutopilot, 
+  onToggleAutopilot, 
+  sentRecords,
+  queueStatus,
+  targetDailyCap,
+  evasionStatus,
+  missions
 }) => {
   const [activeTab, setActiveTab] = useState<'WAR_ROOM' | 'AUDIT_LOG'>('WAR_ROOM');
-  const [liveMissions, setLiveMissions] = useState<Mission[]>([]);
+  const [liveMissions, setLiveMissions] = useState<Mission[]>(missions || []);
   const tickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,9 +54,8 @@ const MissionControl: React.FC<MissionControlProps> = ({
 
       const randomJob = pendingJobs[Math.floor(Math.random() * pendingJobs.length)];
       const opCode = Math.random().toString(16).substring(2, 8).toUpperCase();
-      const isShadow = !randomJob.sourceUrl; // Jobs without a URL are considered Shadow Market (Not Posted)
+      const isShadow = !randomJob.sourceUrl; 
       
-      // Fix: Use explicit type or as const for status to match Mission interface
       const newMission: Mission = {
         id: `miss-${Date.now()}`,
         target: randomJob.company,
@@ -54,9 +66,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
 
       setLiveMissions(prev => [...prev, newMission].slice(-50));
       
-      // Every 5th mission, log a completion event
       if (Math.random() > 0.8) {
-        // Fix: Explicitly type the completion mission to ensure 'status' is a literal type
         const compMission: Mission = {
           id: `comp-${Date.now()}`,
           target: randomJob.company,
@@ -82,7 +92,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
   const discoveredJobs = jobs.filter(j => j.status === 'discovered');
 
   return (
-    <div className="min-h-screen bg-[#02040a] p-4 md:p-10 lg:p-16 space-y-12 pb-40 relative">
+    <div className="min-h-screen bg-[#02040a] p-4 md:p-10 lg:p-16 space-y-12 pb-40 relative border-t border-white/5">
       <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_100%_0%,_rgba(99,102,241,0.02),_transparent_50%)] pointer-events-none"></div>
 
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-10 relative z-10">
@@ -93,7 +103,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Relay Bridge Active</span>
               </div>
-              <p className="text-slate-600 text-[10px] font-black uppercase tracking-[0.4em]">Concurrency: {targetDailyCap/10} Agents</p>
+              <p className="text-slate-600 text-[10px] font-black uppercase tracking-[0.4em]">Concurrency: {targetDailyCap/10} Agents | EVASION: {evasionStatus}</p>
            </div>
         </div>
         <div className="flex flex-row gap-4 w-full lg:w-auto">
@@ -103,6 +113,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
            <button onClick={onToggleAutopilot} className={`flex-1 lg:flex-none px-16 py-6 rounded-[2.5rem] font-black uppercase text-[10px] tracking-[0.4em] shadow-2xl transition-all border ${isAutopilot ? 'bg-red-500 text-white border-red-400' : 'bg-indigo-600 text-white border-indigo-400'}`}>
              {isAutopilot ? 'TERMINATE_AUTO' : 'ENGAGE_DEPLOY'}
            </button>
+           <button onClick={onBack} className="hidden lg:flex px-10 py-6 rounded-[2.5rem] bg-slate-900 border border-white/5 text-[10px] font-black uppercase text-slate-400 hover:text-white transition-all">Back</button>
         </div>
       </div>
 
@@ -205,37 +216,4 @@ const MissionControl: React.FC<MissionControlProps> = ({
                  {queuedJobs.map((job, idx) => (
                    <div key={job.id} className="p-6 bg-black border border-white/5 rounded-3xl space-y-4 group">
                       <div className="flex justify-between items-center">
-                         <span className="text-[10px] font-black text-white uppercase italic truncate max-w-[120px]">{job.company}</span>
-                         <span className={`text-[8px] font-black uppercase ${!job.sourceUrl ? 'text-cyan-400' : 'text-amber-500'}`}>
-                           {!job.sourceUrl ? 'SHADOW_LINK' : 'PUBLIC_APPLY'}
-                         </span>
-                      </div>
-                      <div className="h-1 w-full bg-slate-900 rounded-full overflow-hidden">
-                         <div className="h-full bg-amber-500 transition-all duration-1000" style={{ width: `${Math.floor(Math.random()*80)+10}%`, transitionDelay: `${idx*100}ms` }}></div>
-                      </div>
-                      <div className="flex justify-between items-center text-[7px] font-mono text-slate-700 uppercase">
-                         <span>INJECTING_PERSONA</span>
-                         <span>0x${Math.random().toString(16).substring(2,6)}</span>
-                      </div>
-                   </div>
-                 ))}
-                 {queuedJobs.length === 0 && (
-                   <div className="h-full flex flex-col items-center justify-center text-center opacity-10 space-y-4">
-                      <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                      <p className="text-[9px] font-black uppercase tracking-widest">Relay Buffer Empty</p>
-                   </div>
-                 )}
-              </div>
-
-              <div className="mt-10 pt-10 border-t border-white/5 shrink-0 text-center">
-                 <p className="text-[8px] font-black text-slate-700 uppercase tracking-widest mb-1">Network Integrity</p>
-                 <p className="text-xl font-black text-indigo-400">99.4% STABLE</p>
-              </div>
-           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default MissionControl;
+                         <span className="text-[10px

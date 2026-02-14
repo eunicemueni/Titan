@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { UserProfile, TelemetryLog, SentRecord, AppAnalytics, IndustryType } from '../types';
 import { supabaseService } from '../services/supabaseService';
 
@@ -17,11 +17,19 @@ interface IdentityVaultProps {
 }
 
 const IdentityVault: React.FC<IdentityVaultProps> = ({ 
-  profiles, setProfiles, activeIndex, setActiveIndex, onLog 
+  profiles, 
+  setProfiles, 
+  activeIndex, 
+  setActiveIndex, 
+  onLog,
+  onTrack,
+  sentRecords,
+  setSentRecords,
+  analytics,
+  setAnalytics
 }) => {
   const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState<'EDIT' | 'DOSSIER' | 'DNA_STREAM'>('DNA_STREAM');
-  const [activeExpertise, setActiveExpertise] = useState<IndustryType>('DATA_ANALYST');
   const [isSyncing, setIsSyncing] = useState(false);
   
   const activeProfile = profiles[activeIndex] || profiles[0];
@@ -46,8 +54,6 @@ const IdentityVault: React.FC<IdentityVaultProps> = ({
       return next;
     });
   };
-
-  const industries: IndustryType[] = ['ACTUARIAL', 'INSURANCE', 'PROJECT_MGMT', 'OPERATIONS', 'DATA_ANALYST', 'FINANCE', 'SALES', 'AI_TRAINING', 'GENERAL'];
 
   return (
     <div className="min-h-screen bg-[#02040a] p-4 md:p-10 lg:p-20 space-y-8 animate-in fade-in duration-700 pb-40">

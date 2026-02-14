@@ -35,7 +35,13 @@ const YieldPulse: React.FC<{ value: number; color: string }> = ({ value, color }
   );
 };
 
-const RevenueHubs: React.FC<{ profile: UserProfile; onLog: any; onSent: any; updateStats: any; onBack: any; }> = ({ profile, onLog, onSent, onBack }) => {
+const RevenueHubs: React.FC<{ 
+  profile: UserProfile; 
+  onLog: (msg: string, level: TelemetryLog['level']) => void; 
+  onSent: (record: Omit<SentRecord, 'id' | 'timestamp' | 'status'>) => void; 
+  updateStats: (updates: Partial<UserProfile['stats']>) => void; 
+  onBack: () => void; 
+}> = ({ profile, onLog, onSent, updateStats, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [sector, setSector] = useState('');
   const [results, setResults] = useState<YieldNode[]>([]);

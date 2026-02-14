@@ -17,13 +17,15 @@ interface ScraperNodeProps {
   targetDailyCap: number;
 }
 
-const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs, onBack, targetDailyCap }) => {
+const ScraperNode: React.FC<ScraperNodeProps> = ({ 
+  profile, onLog, setJobs, jobs, updateStats, onSent, onBack, bridgeStatus, onReconnect, targetDailyCap 
+}) => {
   const [isScanning, setIsScanning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSwipe, setShowSwipe] = useState(false);
   
   const [query, setQuery] = useState('');
-  const [location, setLocation] = useState('Remote Worldwide'); // Permanent Global Default
+  const [location, setLocation] = useState('Remote Worldwide'); 
 
   const visibleJobs = useMemo(() => jobs.filter(j => j.status === 'discovered'), [jobs]);
   const allSelected = visibleJobs.length > 0 && Array.from(selectedIds).length >= visibleJobs.length;
