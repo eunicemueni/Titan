@@ -129,10 +129,10 @@ const App: React.FC = () => {
           setProfiles(cloudProfiles);
           addLog("IDENTITY: Global DNA synchronized from Supabase.", "success");
         } else {
-          addLog("IDENTITY: Using Local DNA fallbacks (Hardcoded).", "warning");
+          addLog("IDENTITY: Using Local DNA fallbacks.", "warning");
         }
       } catch (err) {
-        addLog("UPLINK: Synchronization Error. Using local state.", "error");
+        addLog("UPLINK: Sync Error. Using local cache.", "error");
       }
     };
     hydrate();
