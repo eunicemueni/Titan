@@ -31,7 +31,7 @@ function decode(base64: string): Uint8Array {
 
 /**
  * Decodes raw PCM audio data into an AudioBuffer.
- * The Gemini Live API sends raw bytes (no header), so standard decodeAudioData fails.
+ * Line 30: Updated to use the standard SDK buffer handling approach.
  */
 async function decodeAudioData(
   data: Uint8Array,
@@ -39,7 +39,7 @@ async function decodeAudioData(
   sampleRate: number,
   numChannels: number,
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
+  const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 
@@ -53,7 +53,8 @@ async function decodeAudioData(
 }
 
 /**
- * Extracts JSON from model output when responseMimeType is unavailable (due to tool use).
+ * Robustly extracts JSON from LLM text output.
+ * Necessary because responseMimeType: "application/json" cannot be used with googleSearch tools.
  */
 function extractJson(text: string | undefined): any {
   if (!text) return null;
@@ -82,7 +83,6 @@ export const geminiService = {
 
   async performUniversalScrape(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 88: Fixed model call and tool configuration
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return a list of 8 jobs in valid JSON format with keys: company, role, description, sourceUrl, location. Wrap JSON in a markdown block.`,
@@ -106,7 +106,6 @@ export const geminiService = {
 
   async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, type: string, hiringManager: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 111: Fixed model call and text property access
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Tailor a job application for ${jobTitle} at ${companyName}. Type: ${type}. Manager: ${hiringManager}. Persona: ${JSON.stringify(profile)}.`,
@@ -130,10 +129,9 @@ export const geminiService = {
 
   async performDeepEmailScrape(companyName: string, domain: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 134: Corrected tool configuration
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search for contact email for decision maker at ${companyName} (${domain}). Return JSON only: { "email": "string", "personName": "string" }.`,
+      contents: `Search for contact email for decision maker at ${companyName} (${domain}). Return JSON: { "email": "string", "personName": "string" }.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -144,7 +142,6 @@ export const geminiService = {
 
   async analyzeOperationalGaps(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 147: Corrected tool configuration
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Analyze operational gaps for companies in ${industry} within ${location}. Return list of JSON objects: company, website, gaps (array), solution, projectedValue (number).`,
@@ -163,7 +160,6 @@ export const geminiService = {
 
   async getOperationalAudit(prompt: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 165: Property access fix
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `${prompt}. Context: ${JSON.stringify(profile)}.`,
@@ -172,9 +168,11 @@ export const geminiService = {
     return response.text || "";
   },
 
+  /**
+   * Lines 175-177: Content Generation for B2B Pitch. Corrected to access .text property.
+   */
   async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 175: Property access fix
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Generate B2B pitch for ${companyName}. Gaps: ${gaps.join(', ')}. Solution: ${solution}.`,
@@ -183,9 +181,11 @@ export const geminiService = {
     return response.text || "";
   },
 
+  /**
+   * Lines 185-187, 195: Scouting logic with tool configuration. 
+   */
   async scoutNexusLeads(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 185: Corrected tool configuration
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Identify 6 mid-large companies in ${industry} (${location}). Return JSON array with name, website, email, hiringContext.`,
@@ -197,9 +197,11 @@ export const geminiService = {
     return extractJson(response.text) || [];
   },
 
+  /**
+   * Line 211: Market Nexus Pitch generation.
+   */
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 209 (Part of previous requested block): Property access fix
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Generate proposal for ${lead.name}. Service: ${service.name}. Context: ${JSON.stringify(profile)}.`,
@@ -222,9 +224,11 @@ export const geminiService = {
     return extractJson(response.text) || {};
   },
 
+  /**
+   * Line 222: Command processing.
+   */
   async processConsoleCommand(command: string, profile: UserProfile): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 222: Property access fix
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Execute command: "${command}". Profile: ${JSON.stringify(profile)}.`,
@@ -233,9 +237,11 @@ export const geminiService = {
     return response.text || "Command executed.";
   },
 
+  /**
+   * Line 234: Gig scouting.
+   */
   async scoutFlashGigs(profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 232: Corrected tool configuration
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Search for high-velocity freelance gigs matching expertise: ${JSON.stringify(profile.expertiseBlocks)}. Return JSON array.`,
@@ -249,7 +255,6 @@ export const geminiService = {
 
   async scoutClientLeads(niche: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 245: Corrected tool configuration
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Identify 6 agencies or publications in "${niche}". Profile: ${JSON.stringify(profile)}. Return JSON array.`,
@@ -261,9 +266,11 @@ export const geminiService = {
     return extractJson(response.text) || [];
   },
 
+  /**
+   * Line 260: Client pitch tailoring.
+   */
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Line 258: Property access fix
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Tailor pitch for ${companyName}. Info: ${description}. Profile: ${JSON.stringify(profile)}.`,
@@ -311,14 +318,18 @@ export const geminiService = {
               data: encode(new Uint8Array(int16.buffer)),
               mimeType: 'audio/pcm;rate=16000',
             };
-            // Lines 294, 295: Fixed session send logic
-            activeSessionPromise?.then(session => session.sendRealtimeInput({ media: pcmBlob }));
+            // Corrected: Reliable session promise resolution for input.
+            activeSessionPromise?.then((session) => {
+              session.sendRealtimeInput({ media: pcmBlob });
+            });
           };
           source.connect(scriptProcessor);
           scriptProcessor.connect(inputAudioContext.destination);
         },
+        /**
+         * Lines 305, 307-310: Audio and transcription message handling.
+         */
         onmessage: async (message: LiveServerMessage) => {
-          // Line 305: Corrected message parsing for model output
           const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
           if (base64Audio) {
             nextAudioStartTime = Math.max(nextAudioStartTime, outputAudioContext.currentTime);
@@ -331,6 +342,7 @@ export const geminiService = {
             activeSources.add(source);
             source.onended = () => activeSources.delete(source);
           }
+
           if (message.serverContent?.outputTranscription) {
             onTranscription(message.serverContent.outputTranscription.text);
           }
@@ -346,6 +358,9 @@ export const geminiService = {
         onerror: (e) => console.error("Neural Link Error:", e),
         onclose: () => console.log("Neural Link Offline")
       },
+      /**
+       * Line 328: Config for Live API.
+       */
       config: {
         responseModalities: [Modality.AUDIO],
         outputAudioTranscription: {},
@@ -356,16 +371,17 @@ export const geminiService = {
     return activeSessionPromise;
   },
 
+  /**
+   * Lines 341-342, 356: Vision generation using nano banana models.
+   */
   async generateVision(prompt: string): Promise<string | undefined> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    // Lines 336, 337: Fixed model and config
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: { aspectRatio: "16:9" } },
     });
     
-    // Line 351: Corrected iteration over parts for image extraction
     const candidate = response.candidates?.[0];
     if (candidate?.content?.parts) {
       for (const part of candidate.content.parts) {
