@@ -2,7 +2,7 @@
   "name": "titan-os-command-ai",
   "version": "7.0.0",
   "description": "Autonomous Career & Business Operating System",
-  "main": "server.js",
+  "main": "services/server.js",
   "type": "module",
   "scripts": {
     "dev": "vite",
