@@ -113,7 +113,6 @@ const App: React.FC = () => {
   }, []);
 
   const renderView = () => {
-    // Specific props for each view to avoid spreading unnecessary props
     const basicProps = {
       profile: currentProfile,
       onLog: addLog,
