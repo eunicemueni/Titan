@@ -45,7 +45,9 @@ EXPERIENCE
 Postal Corporation of Kenya | Actuarial & Risk Analyst | 2017 – Present
 • Spearheaded actuarial valuations for staff pension schemes (5,000+ members).
 • Developed stochastic models for liability forecasting, saving the corporation KES 50M in projected overhead.
-• Automated financial reporting pipelines using Python and SQL, reducing processing time by 40%.`,
+• Automated financial reporting pipelines using Python and SQL, reducing processing time by 40%.
+• Implemented robust risk management frameworks resulting in 15% reduction in operational friction.
+• Managed end-to-end data quality audits for multi-million dollar asset portfolios.`,
     expertiseBlocks: { 
       "ACTUARIAL": "Expertise in actuarial valuations (Prophet, MoSes) and pension scheme management for 5000+ members. KES 50M identified in savings.",
       "INSURANCE": "Senior architecture for insurance modeling and liability assessment. Advanced Excel VBA and stochastic logic.",
@@ -79,7 +81,8 @@ EXPERIENCE
 Growth Analytics Hub | Senior Data Strategist | 2021 – Present
 • Modeled enterprise revenue clusters identifying $200k+ in uncaptured B2B opportunities.
 • Implemented AI-driven diagnostic tools for operational friction reduction.
-• Developed interactive dashboards for global remote teams to track real-time performance nodes.`,
+• Developed interactive dashboards for global remote teams to track real-time performance nodes.
+• Led STEM education initiatives integrating data literacy into curriculum for 500+ students.`,
     expertiseBlocks: { 
       "DATA_ANALYST": "Strategic modeling for B2B expansion. Expert in identifying revenue logic deficits via SQL and Python clusters.", 
       "AI_TRAINING": "Leading integration of LLMs for corporate process automation and neural twin modeling.", 

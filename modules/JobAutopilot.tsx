@@ -23,8 +23,7 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({ profile, onLog, setJobs, jobs
   const [showSwipe, setShowSwipe] = useState(false);
   
   const [query, setQuery] = useState('');
-  // Corrected: Shifted from regional to Remote Worldwide default
-  const [location, setLocation] = useState('Remote Worldwide');
+  const [location, setLocation] = useState('Remote Worldwide'); // Permanent Global Default
 
   const visibleJobs = useMemo(() => jobs.filter(j => j.status === 'discovered'), [jobs]);
   const allSelected = visibleJobs.length > 0 && Array.from(selectedIds).length >= visibleJobs.length;
