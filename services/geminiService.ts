@@ -7,9 +7,6 @@ GOAL: Maximize user revenue via 100% remote strategic nodes.
 CORE PERSO_DNA: Professional, authoritative, efficient.
 RULES: Use Google Search grounding for recent market data. When using search, return information clearly and include factual URLs where available from the grounding metadata.`;
 
-/**
- * Manual Base64 encoding/decoding as required by @google/genai guidelines.
- */
 function encode(bytes: Uint8Array): string {
   let binary = '';
   const len = bytes.byteLength;
@@ -29,10 +26,6 @@ function decode(base64: string): Uint8Array {
   return bytes;
 }
 
-/**
- * Decodes raw PCM audio data into an AudioBuffer.
- * Line 30: Using standard SDK approach for raw PCM buffer conversion.
- */
 async function decodeAudioData(
   data: Uint8Array,
   ctx: AudioContext,
@@ -42,7 +35,6 @@ async function decodeAudioData(
   const dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
     for (let i = 0; i < frameCount; i++) {
@@ -52,10 +44,6 @@ async function decodeAudioData(
   return buffer;
 }
 
-/**
- * Robustly extracts JSON from LLM text output.
- * Necessary because responseMimeType: "application/json" cannot be used with googleSearch tools.
- */
 function extractJson(text: string | undefined): any {
   if (!text) return null;
   try {
@@ -91,17 +79,10 @@ export const geminiService = {
         tools: [{ googleSearch: {} }]
       }
     });
-    
     const results = extractJson(response.text) || [];
     const groundingSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    const sourceUrls = groundingSources
-      .filter(chunk => chunk.web?.uri)
-      .map(chunk => ({ title: chunk.web?.title, uri: chunk.web?.uri }));
-
-    return results.map((job: any) => ({
-      ...job,
-      metadata: { sources: sourceUrls }
-    }));
+    const sourceUrls = groundingSources.filter(chunk => chunk.web?.uri).map(chunk => ({ title: chunk.web?.title, uri: chunk.web?.uri }));
+    return results.map((job: any) => ({ ...job, metadata: { sources: sourceUrls } }));
   },
 
   async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, type: string, hiringManager: string) {
@@ -168,9 +149,6 @@ export const geminiService = {
     return response.text || "";
   },
 
-  /**
-   * Lines 175, 177: Content generation for B2B Pitch.
-   */
   async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -181,9 +159,6 @@ export const geminiService = {
     return response.text || "";
   },
 
-  /**
-   * Lines 187, 195: Scouting logic and JSON extraction.
-   */
   async scoutNexusLeads(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -197,9 +172,6 @@ export const geminiService = {
     return extractJson(response.text) || [];
   },
 
-  /**
-   * Line 211: Proposal synthesis.
-   */
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -234,9 +206,6 @@ export const geminiService = {
     return response.text || "Command executed.";
   },
 
-  /**
-   * Line 234: Flash gig scouting.
-   */
   async scoutFlashGigs(profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -263,9 +232,6 @@ export const geminiService = {
     return extractJson(response.text) || [];
   },
 
-  /**
-   * Line 260: Tailored pitch.
-   */
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -290,14 +256,11 @@ export const geminiService = {
 
   async connectLive(onTranscription: (text: string) => void, onTurnComplete: () => void) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    
     const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 16000});
     const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
     const outputNode = outputAudioContext.createGain();
     outputNode.connect(outputAudioContext.destination);
-
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
     activeSessionPromise = ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-12-2025',
       callbacks: {
@@ -308,23 +271,13 @@ export const geminiService = {
             const inputData = event.inputBuffer.getChannelData(0);
             const l = inputData.length;
             const int16 = new Int16Array(l);
-            for (let i = 0; i < l; i++) {
-              int16[i] = inputData[i] * 32768;
-            }
-            const pcmBlob = {
-              data: encode(new Uint8Array(int16.buffer)),
-              mimeType: 'audio/pcm;rate=16000',
-            };
-            activeSessionPromise?.then((session) => {
-              session.sendRealtimeInput({ media: pcmBlob });
-            });
+            for (let i = 0; i < l; i++) { int16[i] = inputData[i] * 32768; }
+            const pcmBlob = { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
+            activeSessionPromise?.then((session) => { session.sendRealtimeInput({ media: pcmBlob }); });
           };
           source.connect(scriptProcessor);
           scriptProcessor.connect(inputAudioContext.destination);
         },
-        /**
-         * Lines 305, 307-310: Message handling and audio playback synchronization.
-         */
         onmessage: async (message: LiveServerMessage) => {
           const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
           if (base64Audio) {
@@ -338,13 +291,8 @@ export const geminiService = {
             activeSources.add(source);
             source.onended = () => activeSources.delete(source);
           }
-
-          if (message.serverContent?.outputTranscription) {
-            onTranscription(message.serverContent.outputTranscription.text);
-          }
-          if (message.serverContent?.turnComplete) {
-            onTurnComplete();
-          }
+          if (message.serverContent?.outputTranscription) { onTranscription(message.serverContent.outputTranscription.text); }
+          if (message.serverContent?.turnComplete) { onTurnComplete(); }
           if (message.serverContent?.interrupted) {
             activeSources.forEach(s => { try { s.stop(); } catch(e){} });
             activeSources.clear();
@@ -354,22 +302,15 @@ export const geminiService = {
         onerror: (e) => console.error("Neural Link Error:", e),
         onclose: () => console.log("Neural Link Offline")
       },
-      /**
-       * Line 328: Live configuration.
-       */
       config: {
         responseModalities: [Modality.AUDIO],
         outputAudioTranscription: {},
         systemInstruction: SYSTEM_INSTRUCTION
       }
     });
-
     return activeSessionPromise;
   },
 
-  /**
-   * Lines 341, 342, 356, 362-364: Image generation and extraction logic.
-   */
   async generateVision(prompt: string): Promise<string | undefined> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -377,13 +318,10 @@ export const geminiService = {
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: { aspectRatio: "16:9" } },
     });
-    
     const candidate = response.candidates?.[0];
     if (candidate?.content?.parts) {
       for (const part of candidate.content.parts) {
-        if (part.inlineData) {
-          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        }
+        if (part.inlineData) { return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`; }
       }
     }
     return undefined;
