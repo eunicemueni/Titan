@@ -2,7 +2,7 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { UserProfile, JobRecord, AppView, SentRecord, AppAnalytics, TelemetryLog, QueueStatus } from '../types';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
-import { geminiService } from '../services/geminiService';
+import { geminiService, decodeAudioData } from '../services/geminiService';
 
 interface DashboardProps {
   profile: UserProfile;
@@ -41,21 +41,43 @@ const Dashboard: React.FC<DashboardProps> = ({
     return () => clearInterval(interval);
   }, [isAutopilot]);
 
+  const decode(base64: string): Uint8Array {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  }
+
   const handleStartBriefing = async () => {
+    if (isBriefing) return;
     setIsBriefing(true);
     try {
-      const buffer = await geminiService.generateStrategicBriefing(profile, jobs.length, profile.stats.totalRevenue);
-      if (buffer) {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        audioContextRef.current = ctx;
+      // 1. Initialize Context ON CLICK to satisfy browser safety
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      audioContextRef.current = ctx;
+      if (ctx.state === 'suspended') await ctx.resume();
+
+      // 2. Fetch Strategic DNA
+      const base64Audio = await geminiService.generateStrategicBriefing(profile, jobs.length, profile.stats.totalRevenue);
+      if (base64Audio) {
+        const decodedBytes = decode(base64Audio);
+        const audioBuffer = await decodeAudioData(decodedBytes, ctx, 24000, 1);
         const source = ctx.createBufferSource();
-        source.buffer = buffer;
+        source.buffer = audioBuffer;
         source.connect(ctx.destination);
         source.start();
-        source.onended = () => setIsBriefing(false);
+        source.onended = () => {
+          setIsBriefing(false);
+          ctx.close();
+        };
+      } else {
+        setIsBriefing(false);
       }
     } catch (e) {
-      console.error("Briefing failed:", e);
+      console.error("Strategic Briefing Node Failure:", e);
       setIsBriefing(false);
     }
   };
@@ -64,7 +86,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     return Array.from({ length: 12 }).map((_, i) => ({
       name: `T-${12-i}h`,
       probability: 40 + Math.random() * 55,
-      publicNodes: Math.floor(Math.random() * 20) + 5,
       shadowNodes: Math.floor(Math.random() * 15) + 2
     }));
   }, [targetDailyCap]);
@@ -144,7 +165,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 mb-12">
               <div className="space-y-4">
                 <h1 className="text-5xl md:text-7xl font-black text-white italic tracking-tighter leading-none uppercase">Neural Pulse</h1>
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.4em]">Shadow Network vs Public Uplink Probability</p>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.4em]">Shadow Network Trace Activity</p>
               </div>
               <div className="flex gap-4">
                  <div className="flex items-center gap-4 bg-black/40 p-4 rounded-3xl border border-white/5">
@@ -167,112 +188,91 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <AreaChart data={chartData}>
                     <defs>
                       <linearGradient id="colorProb" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
                         <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                       </linearGradient>
-                      <linearGradient id="colorShadow" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#22d3ee" stopOpacity={0}/>
-                      </linearGradient>
                     </defs>
-                    <XAxis dataKey="name" stroke="#334155" fontSize={10} axisLine={false} tickLine={false} />
-                    <YAxis stroke="#334155" fontSize={10} axisLine={false} tickLine={false} domain={[0, 100]} />
-                    <Tooltip contentStyle={{ backgroundColor: '#02040a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }} />
-                    <Area type="monotone" dataKey="probability" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorProb)" />
-                    <Area type="monotone" dataKey="shadowNodes" stroke="#22d3ee" strokeWidth={2} fillOpacity={1} fill="url(#colorShadow)" strokeDasharray="5 5" />
+                    <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #30363d', fontSize: '10px' }} />
+                    <Area type="monotone" dataKey="probability" stroke="#6366f1" fillOpacity={1} fill="url(#colorProb)" strokeWidth={3} />
                   </AreaChart>
                </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-10">
-            {[
-              { label: 'UHF SCANS', value: jobs.length, color: 'text-white' },
-              { label: 'RELAYS SENT', value: sentRecords.length, color: 'text-indigo-400' },
-              { label: 'WAITING NODES', value: queueStatus.waiting, color: 'text-amber-400' },
-              { label: 'COMPLETED OPS', value: queueStatus.completed, color: 'text-emerald-400' },
-            ].map((stat, i) => (
-              <div key={i} className="bg-slate-950 border border-white/5 p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-xl hover:border-indigo-500/20 transition-all hover:-translate-y-1">
-                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-2">{stat.label}</p>
-                <h3 className={`text-2xl md:text-4xl font-black ${stat.color} italic tracking-tighter`}>{stat.value.toLocaleString()}</h3>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {coreModules.map(mod => (
+              <button 
+                key={mod.id}
+                onClick={() => onNavigate(mod.id)}
+                className={`flex flex-col justify-between p-8 rounded-[3rem] border bg-slate-950 transition-all group ${mod.color}`}
+              >
+                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mb-10 group-hover:scale-110 transition-transform">
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={mod.icon} /></svg>
+                </div>
+                <div>
+                   <h3 className="text-lg font-black text-white uppercase italic tracking-tighter leading-none">{mod.name}</h3>
+                   <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-2">{mod.desc}</p>
+                </div>
+              </button>
             ))}
           </div>
         </div>
 
         <div className="xl:col-span-4 space-y-8 md:space-y-12">
-          <div className="bg-slate-950 border border-white/5 rounded-[3rem] md:rounded-[4rem] p-10 md:p-14 space-y-10 shadow-2xl sticky top-24">
-             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">Command Node</h2>
-                <div className={`w-3 h-3 rounded-full ${isAutopilot ? 'bg-indigo-500 animate-pulse shadow-[0_0_10px_#6366f1]' : 'bg-slate-800'}`}></div>
+          <div className="bg-slate-950 border border-white/5 rounded-[3rem] p-10 flex flex-col justify-between min-h-[400px] shadow-2xl relative group">
+             <div className="absolute inset-0 bg-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-[3rem]"></div>
+             <div className="relative z-10">
+                <div className="flex justify-between items-start mb-8">
+                   <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.5em]">Command Autopilot</h3>
+                   <div className={`w-3 h-3 rounded-full ${isAutopilot ? 'bg-indigo-500 animate-pulse' : 'bg-slate-800'}`}></div>
+                </div>
+                <div className="space-y-1">
+                   <p className="text-4xl font-black text-white italic tracking-tighter uppercase leading-none">{isAutopilot ? 'ACTIVE' : 'STANDBY'}</p>
+                   <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest">Global Relay Protocol: v7.0.1</p>
+                </div>
              </div>
-
-             <div className="space-y-6">
-                <div className="p-8 bg-black/40 border border-white/5 rounded-[2.5rem] space-y-6">
-                   <div className="flex justify-between items-center px-2">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Autonomous Load</span>
-                      <span className="text-lg font-black text-indigo-400 italic">{targetDailyCap} Missions</span>
-                   </div>
-                   <input 
-                     type="range" min="10" max="2500" step="10"
-                     value={targetDailyCap}
-                     onChange={(e) => setTargetDailyCap(parseInt(e.target.value))}
-                     className="w-full h-1 bg-slate-900 rounded-full appearance-none cursor-pointer accent-indigo-500"
-                   />
+             
+             <div className="relative z-10 py-10">
+                <div className="flex justify-between items-center mb-3">
+                   <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Daily Node Cap</span>
+                   <span className="text-sm font-black text-white">{targetDailyCap}</span>
                 </div>
-
-                <div className="p-8 bg-black/40 border border-white/5 rounded-[2.5rem] space-y-4">
-                   <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Node Health</span>
-                      <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Optimized</span>
-                   </div>
-                   <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-3">
-                         <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                         <span className="text-[10px] font-black text-white uppercase tracking-tighter">Public Discovery: READY</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                         <div className="w-1.5 h-1.5 rounded-full bg-cyan-500"></div>
-                         <span className="text-[10px] font-black text-white uppercase tracking-tighter">Shadow Network Trace: ACTIVE</span>
-                      </div>
-                   </div>
-                </div>
+                <input 
+                  type="range" min="10" max="500" value={targetDailyCap} 
+                  onChange={(e) => setTargetDailyCap(parseInt(e.target.value))}
+                  className="w-full accent-indigo-500 h-1 bg-slate-900 rounded-full appearance-none cursor-pointer"
+                />
              </div>
 
              <button 
-               onClick={onToggleAutopilot} 
-               style={{ transform: `scale(${pulseScale})` }}
-               className={`w-full py-6 md:py-8 rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] transition-all shadow-2xl active:scale-95 border ${
-                 isAutopilot 
-                 ? 'bg-red-500/10 text-red-500 border-red-500/20' 
-                 : 'bg-indigo-600 text-white border-indigo-400 hover:shadow-[0_0_30px_rgba(99,102,241,0.4)]'
-               }`}
+               onClick={onToggleAutopilot}
+               className={`relative z-10 w-full py-6 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.4em] transition-all shadow-xl ${isAutopilot ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-white text-black hover:bg-indigo-500 hover:text-white'}`}
              >
-               {isAutopilot ? 'TERMINATE_AUTO' : 'ENGAGE_AUTOPILOT'}
+               {isAutopilot ? 'TERMINATE_MISSION' : 'INITIATE_DEPLOYMENT'}
              </button>
           </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 md:gap-10 pb-40 relative z-10">
-        {coreModules.map((mod) => (
-          <button 
-            key={mod.id} 
-            onClick={() => onNavigate(mod.id)} 
-            className={`p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] border bg-slate-950 transition-all text-left flex flex-col justify-between h-48 md:h-64 group relative overflow-hidden shadow-xl ${mod.color}`}
-          >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 blur-[40px] pointer-events-none transition-all group-hover:bg-white/10"></div>
-            <div className="w-10 h-10 md:w-14 md:h-14 bg-white/5 rounded-2xl flex items-center justify-center mb-6 border border-white/5">
-               <svg className="w-5 h-5 md:w-8 md:h-8 text-slate-500 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={mod.icon} />
-               </svg>
-            </div>
-            <div>
-               <h4 className="text-[11px] md:text-xs font-black text-white uppercase tracking-widest leading-none mb-2">{mod.name}</h4>
-               <p className="text-[8px] md:text-[9px] text-slate-600 font-bold uppercase tracking-tight line-clamp-2">{mod.desc}</p>
-            </div>
-          </button>
-        ))}
+          <div className="bg-black border border-white/5 rounded-[3rem] p-10 space-y-10 shadow-inner">
+             <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-[0.5em]">Telemetry Stream</h3>
+             <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-4">
+                {analytics.activeLeads === 0 && (
+                   <div className="flex gap-4 font-mono text-[9px] text-slate-600 italic">
+                      <span>[SYNC]</span>
+                      <span>Awaiting active node identification...</span>
+                   </div>
+                )}
+                {/* Fallback logs for visual density */}
+                <div className="flex gap-4 font-mono text-[9px] text-indigo-800">
+                   <span>[NODE]</span>
+                   <span>Proxy bridge established via Cloud node 0x7F4</span>
+                </div>
+                <div className="flex gap-4 font-mono text-[9px] text-emerald-800">
+                   <span>[AUTH]</span>
+                   <span>Identity Vault: DNA Integrity 100%</span>
+                </div>
+             </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -5,8 +5,8 @@ import { UserProfile } from "../types";
 const SYSTEM_INSTRUCTION = `SYSTEM: TITAN OS COMMAND AI.
 IDENTITY: High-level autonomous career operating system.
 PERSONA CONTEXT: 
-1. Ayana Inniss (Strategic Growth/B2B): Focused on market expansion, enterprise partnerships, and revenue logic.
-2. Eunice Muema (Actuarial/Risk): Focused on stochastic modeling, liability audits, and financial risk architecture.
+1. Ayana Inniss (Strategic Growth/B2B): Focused on market expansion and revenue logic.
+2. Eunice Muema (Actuarial/Risk): Focused on risk architecture and financial audits.
 
 GOAL: Maximize user revenue via 100% remote strategic nodes.
 CORE DNA: Professional, authoritative, efficient.
@@ -31,7 +31,7 @@ function decode(base64: string): Uint8Array {
   return bytes;
 }
 
-async function decodeAudioData(
+export async function decodeAudioData(
   data: Uint8Array,
   ctx: AudioContext,
   sampleRate: number,
@@ -89,7 +89,7 @@ export const geminiService = {
     const groundingSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const sourceUrls = groundingSources
       .filter(chunk => chunk.web?.uri)
-      .map(chunk => ({ title: chunk.web?.title || "Search Source", uri: chunk.web?.uri }));
+      .map(chunk => ({ title: chunk.web?.title || "Search Source", uri: chunk.web?.uri || "" }));
 
     return results.map((job: any) => ({ 
       ...job, 
@@ -120,25 +120,6 @@ export const geminiService = {
     return extractJson(response.text) || {};
   },
 
-  async scoutCorporateNodesWithMaps(industry: string, location: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Identify corporate headquarters for top companies in ${industry} globally with remote focus. List names and addresses.`,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }, { googleMaps: {} }]
-      }
-    });
-    
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    return groundingChunks.map(chunk => ({
-      name: chunk.web?.title || chunk.maps?.uri?.split('/').pop()?.replace(/_/g, ' ') || "Target Node",
-      address: chunk.web?.title || "Address Hidden",
-      uri: chunk.web?.uri || chunk.maps?.uri || "#"
-    }));
-  },
-
   async generateStrategicBriefing(profile: UserProfile, jobCount: number, revenue: number) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const prompt = `Strategic briefing for ${profile.fullName}: Systems stable. Discovery nodes: ${jobCount}. Pending yield: $${revenue}. Advise on B2B expansion.`;
@@ -156,23 +137,88 @@ export const geminiService = {
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (!base64Audio) return null;
-
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-    const decodedBytes = decode(base64Audio);
-    return await decodeAudioData(decodedBytes, ctx, 24000, 1);
+    return base64Audio;
   },
 
-  async triggerRealDispatch(recipient: string, subject: string, body: string, type: string) {
-    try {
-      const response = await fetch('/api/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipient, subject, body, type })
-      });
-      return response.ok;
-    } catch (e) {
-      return false;
-    }
+  async connectLive(onTranscription: (text: string) => void, onTurnComplete: () => void) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    let currentInputTranscription = '';
+    let currentOutputTranscription = '';
+
+    const sessionPromise = ai.live.connect({
+      model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+      callbacks: {
+        onopen: () => {
+          navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+             const source = audioContext.createMediaStreamSource(stream);
+             const scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+             scriptProcessor.onaudioprocess = (e) => {
+               const inputData = e.inputBuffer.getChannelData(0);
+               const l = inputData.length;
+               const int16 = new Int16Array(l);
+               for (let i = 0; i < l; i++) {
+                 int16[i] = inputData[i] * 32768;
+               }
+               const pcmBase64 = encode(new Uint8Array(int16.buffer));
+               sessionPromise.then(session => {
+                 session.sendRealtimeInput({ media: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
+               }).catch(() => {});
+             };
+             source.connect(scriptProcessor);
+             scriptProcessor.connect(audioContext.destination);
+          });
+        },
+        onmessage: async (message: LiveServerMessage) => {
+          if (message.serverContent?.outputTranscription) {
+            currentOutputTranscription += message.serverContent.outputTranscription.text;
+            onTranscription(currentOutputTranscription);
+          } else if (message.serverContent?.inputTranscription) {
+            currentInputTranscription += message.serverContent.inputTranscription.text;
+          }
+
+          if (message.serverContent?.turnComplete) {
+            onTurnComplete();
+            currentInputTranscription = '';
+            currentOutputTranscription = '';
+          }
+
+          const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+          if (base64Audio) {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+            const decodedBytes = decode(base64Audio);
+            const audioBuffer = await decodeAudioData(decodedBytes, ctx, 24000, 1);
+            const source = ctx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(ctx.destination);
+            
+            source.start(nextAudioStartTime);
+            nextAudioStartTime = Math.max(ctx.currentTime, nextAudioStartTime) + audioBuffer.duration;
+            activeSources.add(source);
+            source.onended = () => activeSources.delete(source);
+          }
+
+          if (message.serverContent?.interrupted) {
+            activeSources.forEach(s => { try { s.stop(); } catch(e) {} });
+            activeSources.clear();
+            nextAudioStartTime = 0;
+          }
+        },
+        onerror: (e) => console.error('Neural Link Runtime Error:', e),
+        onclose: () => console.debug('Neural Link Session Terminated'),
+      },
+      config: {
+        responseModalities: [Modality.AUDIO],
+        outputAudioTranscription: {},
+        inputAudioTranscription: {},
+        systemInstruction: SYSTEM_INSTRUCTION,
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
+        }
+      }
+    });
+    activeSessionPromise = sessionPromise;
+    return sessionPromise;
   },
 
   async performDeepEmailScrape(companyName: string, domain: string) {
@@ -188,29 +234,6 @@ export const geminiService = {
     return extractJson(response.text) || { email: "Not Found", personName: "Decision Maker" };
   },
 
-  async analyzeOperationalGaps(industry: string, location: string, profileName: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Find companies in ${industry} with operational scaling issues. Tailor for ${profileName}. Return JSON array: {company, website, gaps, solution, projectedValue}.`,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }]
-      }
-    });
-    return extractJson(response.text) || [];
-  },
-
-  async generateB2BPitch(companyName: string, gaps: string[], solution: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `Proposal for ${companyName}. Gaps: ${gaps.join(', ')}. Solution: ${solution}. Persona: ${profile.fullName}.`,
-      config: { systemInstruction: SYSTEM_INSTRUCTION }
-    });
-    return response.text;
-  },
-
   async scoutNexusLeads(industry: string, location: string) {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -222,57 +245,6 @@ export const geminiService = {
       }
     });
     return extractJson(response.text) || [];
-  },
-
-  async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `Proposal for ${lead.name} selling ${service.name} ($${service.price}). Return JSON: {executiveSummary, implementationPhases, valueProjection, emailBody, subject}.`,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            executiveSummary: { type: Type.STRING },
-            implementationPhases: { type: Type.STRING },
-            valueProjection: { type: Type.STRING },
-            emailBody: { type: Type.STRING },
-            subject: { type: Type.STRING }
-          },
-          required: ["executiveSummary", "implementationPhases", "valueProjection", "emailBody", "subject"]
-        }
-      }
-    });
-    return extractJson(response.text);
-  },
-
-  async generateVision(prompt: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: prompt }] },
-      config: {
-        imageConfig: { aspectRatio: "16:9" }
-      }
-    });
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    return null;
-  },
-
-  async processConsoleCommand(command: string, profile: UserProfile): Promise<string> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Command: "${command}". Profile: ${profile.fullName}.`,
-      config: { systemInstruction: SYSTEM_INSTRUCTION }
-    });
-    return response.text || "Command processed.";
   },
 
   async scoutFlashGigs(profile: UserProfile) {
@@ -301,107 +273,13 @@ export const geminiService = {
     return extractJson(response.text) || [];
   },
 
-  async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
+  async processConsoleCommand(command: string, profile: UserProfile): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `Pitch for ${companyName}. Profile: ${profile.fullName}. Return JSON: {subject, body, contactPersonStrategy}.`,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            subject: { type: Type.STRING },
-            body: { type: Type.STRING },
-            contactPersonStrategy: { type: Type.STRING }
-          },
-          required: ["subject", "body", "contactPersonStrategy"]
-        }
-      }
+      model: 'gemini-3-flash-preview',
+      contents: `Command: "${command}". Profile: ${profile.fullName}.`,
+      config: { systemInstruction: SYSTEM_INSTRUCTION }
     });
-    return extractJson(response.text);
-  },
-
-  async connectLive(onTranscription: (text: string) => void, onTurnComplete: () => void) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    let currentInputTranscription = '';
-    let currentOutputTranscription = '';
-
-    const sessionPromise = ai.live.connect({
-      model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-      callbacks: {
-        onopen: () => {
-          console.debug('Neural Link Session Opened');
-          navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-             const source = audioContext.createMediaStreamSource(stream);
-             const scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
-             scriptProcessor.onaudioprocess = (e) => {
-               const inputData = e.inputBuffer.getChannelData(0);
-               const l = inputData.length;
-               const int16 = new Int16Array(l);
-               for (let i = 0; i < l; i++) {
-                 int16[i] = inputData[i] * 32768;
-               }
-               const pcmBase64 = encode(new Uint8Array(int16.buffer));
-               sessionPromise.then(session => {
-                 session.sendRealtimeInput({ media: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
-               });
-             };
-             source.connect(scriptProcessor);
-             scriptProcessor.connect(audioContext.destination);
-          });
-        },
-        onmessage: async (message: LiveServerMessage) => {
-          if (message.serverContent?.outputTranscription) {
-            currentOutputTranscription += message.serverContent.outputTranscription.text;
-            onTranscription(currentOutputTranscription);
-          } else if (message.serverContent?.inputTranscription) {
-            currentInputTranscription += message.serverContent.inputTranscription.text;
-          }
-
-          if (message.serverContent?.turnComplete) {
-            onTurnComplete();
-            currentInputTranscription = '';
-            currentOutputTranscription = '';
-          }
-
-          const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
-          if (base64Audio) {
-            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-            const decodedBytes = decode(base64Audio);
-            const audioBuffer = await decodeAudioData(decodedBytes, ctx, 24000, 1);
-            const source = ctx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(ctx.destination);
-            
-            source.start(nextAudioStartTime);
-            nextAudioStartTime = Math.max(ctx.currentTime, nextAudioStartTime) + audioBuffer.duration;
-            activeSources.add(source);
-            source.onended = () => activeSources.delete(source);
-          }
-
-          if (message.serverContent?.interrupted) {
-            activeSources.forEach(s => s.stop());
-            activeSources.clear();
-            nextAudioStartTime = 0;
-          }
-        },
-        onerror: (e) => console.error('Neural Link Runtime Error:', e),
-        onclose: () => console.debug('Neural Link Session Terminated'),
-      },
-      config: {
-        responseModalities: [Modality.AUDIO],
-        outputAudioTranscription: {},
-        inputAudioTranscription: {},
-        systemInstruction: SYSTEM_INSTRUCTION,
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
-        }
-      }
-    });
-    activeSessionPromise = sessionPromise;
-    return sessionPromise;
+    return response.text || "Command processed.";
   }
 };
