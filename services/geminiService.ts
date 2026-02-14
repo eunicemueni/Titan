@@ -48,7 +48,7 @@ function extractJson(text: string | undefined): any {
   if (!text) return null;
   try {
     const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    const contentToParse = jsonBlockMatch ? jsonBlockMatch[1] : text;
+    const contentToParse = (jsonBlockMatch ? jsonBlockMatch[1] : text).trim();
     const firstBracket = contentToParse.search(/[\[\{]/);
     const lastBracket = contentToParse.lastIndexOf(contentToParse.match(/[\]\}]/)?.[0] || '');
     if (firstBracket !== -1 && lastBracket !== -1) {
@@ -272,7 +272,7 @@ export const geminiService = {
             const l = inputData.length;
             const int16 = new Int16Array(l);
             for (let i = 0; i < l; i++) { int16[i] = inputData[i] * 32768; }
-            const pcmBlob = { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
+            const pcmBlob = { data: encode(new Uint8Array(int16.buffer, int16.byteOffset, int16.byteLength)), mimeType: 'audio/pcm;rate=16000' };
             activeSessionPromise?.then((session) => { session.sendRealtimeInput({ media: pcmBlob }); });
           };
           source.connect(scriptProcessor);
