@@ -41,7 +41,6 @@ const MissionControl: React.FC<MissionControlProps> = ({
     if (tickerRef.current) tickerRef.current.scrollTop = tickerRef.current.scrollHeight;
   }, [liveMissions]);
 
-  // MISSION SIMULATION LOGIC
   useEffect(() => {
     if (!isAutopilot) {
       setLiveMissions([]);

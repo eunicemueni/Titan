@@ -18,7 +18,16 @@ interface ScraperNodeProps {
 }
 
 const ScraperNode: React.FC<ScraperNodeProps> = ({ 
-  profile, onLog, setJobs, jobs, updateStats, onSent, onBack, bridgeStatus, onReconnect, targetDailyCap 
+  profile, 
+  onLog, 
+  setJobs, 
+  jobs, 
+  updateStats, 
+  onSent, 
+  onBack, 
+  bridgeStatus, 
+  onReconnect, 
+  targetDailyCap 
 }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
