@@ -32,7 +32,7 @@ async function decodeAudioData(
   sampleRate: number,
   numChannels: number,
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
+  const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
   for (let channel = 0; channel < numChannels; channel++) {
@@ -272,7 +272,7 @@ export const geminiService = {
             const l = inputData.length;
             const int16 = new Int16Array(l);
             for (let i = 0; i < l; i++) { int16[i] = inputData[i] * 32768; }
-            const pcmBlob = { data: encode(new Uint8Array(int16.buffer, int16.byteOffset, int16.byteLength)), mimeType: 'audio/pcm;rate=16000' };
+            const pcmBlob = { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
             activeSessionPromise?.then((session) => { session.sendRealtimeInput({ media: pcmBlob }); });
           };
           source.connect(scriptProcessor);
