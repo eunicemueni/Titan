@@ -1,7 +1,7 @@
 
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { UserProfile, JobRecord, AppView, SentRecord, AppAnalytics, TelemetryLog, QueueStatus } from '../types';
-import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 import { geminiService, decodeAudioData } from '../services/geminiService';
 
 interface DashboardProps {
@@ -25,23 +25,13 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ 
   profile, profiles, activeIndex, onSwitchProfile, jobs, sentRecords,
-  onNavigate, isAutopilot, onToggleAutopilot, queueStatus, targetDailyCap, setTargetDailyCap, evasionStatus,
+  onNavigate, isAutopilot, onToggleAutopilot, targetDailyCap, setTargetDailyCap,
   hubOnline, analytics
 }) => {
-  const [pulseScale, setPulseScale] = useState(1);
   const [isBriefing, setIsBriefing] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  useEffect(() => {
-    if (!isAutopilot) return;
-    const interval = setInterval(() => {
-      setPulseScale(1.1);
-      setTimeout(() => setPulseScale(1), 200);
-    }, 1500);
-    return () => clearInterval(interval);
-  }, [isAutopilot]);
-
-  const decode(base64: string): Uint8Array {
+  const decode = (base64: string): Uint8Array => {
     const binaryString = atob(base64);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
@@ -49,18 +39,16 @@ const Dashboard: React.FC<DashboardProps> = ({
       bytes[i] = binaryString.charCodeAt(i);
     }
     return bytes;
-  }
+  };
 
   const handleStartBriefing = async () => {
     if (isBriefing) return;
     setIsBriefing(true);
     try {
-      // 1. Initialize Context ON CLICK to satisfy browser safety
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       audioContextRef.current = ctx;
       if (ctx.state === 'suspended') await ctx.resume();
 
-      // 2. Fetch Strategic DNA
       const base64Audio = await geminiService.generateStrategicBriefing(profile, jobs.length, profile.stats.totalRevenue);
       if (base64Audio) {
         const decodedBytes = decode(base64Audio);
@@ -77,7 +65,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         setIsBriefing(false);
       }
     } catch (e) {
-      console.error("Strategic Briefing Node Failure:", e);
+      console.error("Briefing Error:", e);
       setIsBriefing(false);
     }
   };
@@ -103,10 +91,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="p-4 md:p-8 lg:p-12 xl:p-16 max-w-[1800px] mx-auto space-y-8 md:space-y-12 relative overflow-hidden">
-      
       <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20" xmlns="http://www.w3.org/2000/svg">
         <path d="M 10% 20% Q 30% 10% 50% 30% T 90% 20%" fill="none" stroke="url(#lineGradient)" strokeWidth="0.5" className="animate-pulse" />
-        <path d="M 5% 80% Q 25% 70% 45% 90% T 85% 80%" fill="none" stroke="url(#lineGradient)" strokeWidth="0.5" />
         <defs>
           <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="transparent" />
@@ -143,11 +129,10 @@ const Dashboard: React.FC<DashboardProps> = ({
              className={`flex items-center gap-3 px-6 py-2.5 rounded-full border transition-all ${isBriefing ? 'bg-amber-500 border-amber-400 text-black animate-pulse' : 'bg-black border-white/10 text-slate-400 hover:text-white hover:border-white/30'}`}
            >
               <svg className={`w-4 h-4 ${isBriefing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
-              <span className="text-[9px] font-black uppercase tracking-widest">{isBriefing ? 'Neural Briefing Live' : 'Initiate Strategic Briefing'}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest">{isBriefing ? 'Briefing Live' : 'Start Strategic Briefing'}</span>
            </button>
-           <div className="h-10 w-px bg-white/5"></div>
            <div className="flex flex-col items-end">
-              <span className="text-[8px] font-black text-slate-700 uppercase">Neural Uplink</span>
+              <span className="text-[8px] font-black text-slate-700 uppercase tracking-widest">Neural Status</span>
               <div className="flex items-center gap-2">
                  <span className={`w-1.5 h-1.5 rounded-full ${hubOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
                  <span className={`text-[10px] font-black uppercase tracking-tighter ${hubOnline ? 'text-emerald-500' : 'text-red-500'}`}>
@@ -165,35 +150,22 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 mb-12">
               <div className="space-y-4">
                 <h1 className="text-5xl md:text-7xl font-black text-white italic tracking-tighter leading-none uppercase">Neural Pulse</h1>
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.4em]">Shadow Network Trace Activity</p>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.4em]">Operational Discovery Activity</p>
               </div>
               <div className="flex gap-4">
                  <div className="flex items-center gap-4 bg-black/40 p-4 rounded-3xl border border-white/5">
-                   <div className="pr-2">
-                      <p className="text-[8px] font-black text-indigo-400 uppercase mb-1">Public Yield</p>
-                      <p className="text-2xl font-black text-white italic leading-none">{publicYield}</p>
-                   </div>
+                    <p className="text-[8px] font-black text-indigo-400 uppercase">Public Nodes: {publicYield}</p>
                  </div>
                  <div className="flex items-center gap-4 bg-black/40 p-4 rounded-3xl border border-cyan-500/30">
-                   <div className="pr-2">
-                      <p className="text-[8px] font-black text-cyan-400 uppercase mb-1">Shadow Yield</p>
-                      <p className="text-2xl font-black text-white italic leading-none">{shadowYield}</p>
-                   </div>
+                    <p className="text-[8px] font-black text-cyan-400 uppercase">Shadow Nodes: {shadowYield}</p>
                  </div>
               </div>
             </div>
-
             <div className="h-[300px] md:h-[400px] w-full">
                <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="colorProb" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
                     <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #30363d', fontSize: '10px' }} />
-                    <Area type="monotone" dataKey="probability" stroke="#6366f1" fillOpacity={1} fill="url(#colorProb)" strokeWidth={3} />
+                    <Area type="monotone" dataKey="probability" stroke="#6366f1" fillOpacity={0.1} fill="#6366f1" strokeWidth={3} />
                   </AreaChart>
                </ResponsiveContainer>
             </div>
@@ -220,7 +192,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         <div className="xl:col-span-4 space-y-8 md:space-y-12">
           <div className="bg-slate-950 border border-white/5 rounded-[3rem] p-10 flex flex-col justify-between min-h-[400px] shadow-2xl relative group">
-             <div className="absolute inset-0 bg-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-[3rem]"></div>
              <div className="relative z-10">
                 <div className="flex justify-between items-start mb-8">
                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.5em]">Command Autopilot</h3>
@@ -228,13 +199,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 <div className="space-y-1">
                    <p className="text-4xl font-black text-white italic tracking-tighter uppercase leading-none">{isAutopilot ? 'ACTIVE' : 'STANDBY'}</p>
-                   <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest">Global Relay Protocol: v7.0.1</p>
+                   <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest">Core Version: v7.0.5</p>
                 </div>
              </div>
-             
              <div className="relative z-10 py-10">
                 <div className="flex justify-between items-center mb-3">
-                   <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Daily Node Cap</span>
+                   <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Daily Limit</span>
                    <span className="text-sm font-black text-white">{targetDailyCap}</span>
                 </div>
                 <input 
@@ -243,33 +213,31 @@ const Dashboard: React.FC<DashboardProps> = ({
                   className="w-full accent-indigo-500 h-1 bg-slate-900 rounded-full appearance-none cursor-pointer"
                 />
              </div>
-
              <button 
                onClick={onToggleAutopilot}
                className={`relative z-10 w-full py-6 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.4em] transition-all shadow-xl ${isAutopilot ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-white text-black hover:bg-indigo-500 hover:text-white'}`}
              >
-               {isAutopilot ? 'TERMINATE_MISSION' : 'INITIATE_DEPLOYMENT'}
+               {isAutopilot ? 'STOP MISSION' : 'START DEPLOYMENT'}
              </button>
           </div>
 
-          <div className="bg-black border border-white/5 rounded-[3rem] p-10 space-y-10 shadow-inner">
+          <div className="bg-black border border-white/5 rounded-[3rem] p-10 space-y-10 shadow-inner overflow-hidden">
              <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-[0.5em]">Telemetry Stream</h3>
              <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-4">
-                {analytics.activeLeads === 0 && (
-                   <div className="flex gap-4 font-mono text-[9px] text-slate-600 italic">
-                      <span>[SYNC]</span>
-                      <span>Awaiting active node identification...</span>
-                   </div>
-                )}
-                {/* Fallback logs for visual density */}
                 <div className="flex gap-4 font-mono text-[9px] text-indigo-800">
                    <span>[NODE]</span>
-                   <span>Proxy bridge established via Cloud node 0x7F4</span>
+                   <span>Proxy bridge established via global mesh</span>
                 </div>
                 <div className="flex gap-4 font-mono text-[9px] text-emerald-800">
                    <span>[AUTH]</span>
-                   <span>Identity Vault: DNA Integrity 100%</span>
+                   <span>Identity DNA Verified: Integrity 100%</span>
                 </div>
+                {analytics.activeLeads > 0 && (
+                   <div className="flex gap-4 font-mono text-[9px] text-white">
+                      <span>[SYNC]</span>
+                      <span>Processing {analytics.activeLeads} candidate nodes...</span>
+                   </div>
+                )}
              </div>
           </div>
         </div>

@@ -2,6 +2,9 @@
 import { GoogleGenAI, Type, Modality, GenerateContentResponse, LiveServerMessage } from "@google/genai";
 import { UserProfile } from "../types";
 
+// Detect if we are in production or local dev
+const API_BASE = process.env.VITE_API_URL || '';
+
 const SYSTEM_INSTRUCTION = `SYSTEM: TITAN OS COMMAND AI.
 IDENTITY: High-level autonomous career operating system.
 PERSONA CONTEXT: 
@@ -95,6 +98,63 @@ export const geminiService = {
       ...job, 
       metadata: { sources: sourceUrls } 
     }));
+  },
+
+  async scoutCorporateNodesWithMaps(industry: string, region: string) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Find headquarters and physical office locations for ${industry} companies in ${region}.`,
+      config: {
+        tools: [{ googleMaps: {} }],
+      },
+    });
+    
+    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    return groundingChunks
+      .filter(chunk => chunk.maps)
+      .map(chunk => ({
+        name: chunk.maps?.title || "Corporate Node",
+        address: chunk.maps?.title || "Location identified",
+        uri: chunk.maps?.uri || ""
+      }));
+  },
+
+  async analyzeOperationalGaps(industry: string, location: string, persona: string) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Analyze operational logic gaps for companies in ${industry} at ${location}. Persona: ${persona}. Return JSON array of YieldNode objects: {company, website, gaps, solution, projectedValue, complexity}.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              company: { type: Type.STRING },
+              website: { type: Type.STRING },
+              gaps: { type: Type.ARRAY, items: { type: Type.STRING } },
+              solution: { type: Type.STRING },
+              projectedValue: { type: Type.NUMBER },
+              complexity: { type: Type.STRING },
+            },
+            required: ["company", "website", "gaps", "solution", "projectedValue", "complexity"]
+          }
+        }
+      }
+    });
+    return extractJson(response.text) || [];
+  },
+
+  async generateB2BPitch(company: string, gaps: string[], solution: string, profile: UserProfile) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Generate a high-authority B2B pitch for ${company}. Gaps: ${gaps.join(', ')}. Solution: ${solution}. Profile: ${profile.fullName}.`,
+      config: { systemInstruction: SYSTEM_INSTRUCTION }
+    });
+    return response.text;
   },
 
   async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, type: string, hiringManager: string) {
@@ -204,8 +264,8 @@ export const geminiService = {
             nextAudioStartTime = 0;
           }
         },
-        onerror: (e) => console.error('Neural Link Runtime Error:', e),
-        onclose: () => console.debug('Neural Link Session Terminated'),
+        onerror: (e) => console.error('Neural Link Error:', e),
+        onclose: () => console.debug('Neural Link Terminated'),
       },
       config: {
         responseModalities: [Modality.AUDIO],
@@ -225,7 +285,7 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search for best corporate contact email and manager name for ${companyName} (${domain}). Return JSON: {email, personName}.`,
+      contents: `Search for corporate contact email and manager name for ${companyName} (${domain}). Return JSON: {email, personName}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -251,20 +311,7 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Search high-paying freelance gigs for ${profile.domain}. Return JSON array.`,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }]
-      }
-    });
-    return extractJson(response.text) || [];
-  },
-
-  async scoutClientLeads(niche: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Find 10 clients for niche: ${niche}. Profile: ${profile.fullName}. Return JSON array: {companyName, website, description, type, opportunityScore}.`,
+      contents: `Search freelance gigs for ${profile.domain}. Return JSON array.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ googleSearch: {} }]
@@ -281,5 +328,109 @@ export const geminiService = {
       config: { systemInstruction: SYSTEM_INSTRUCTION }
     });
     return response.text || "Command processed.";
+  },
+
+  async triggerRealDispatch(email: string, subject: string, body: string, type: string) {
+    try {
+      const response = await fetch(`${API_BASE}/api/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient: email, subject, body, type })
+      });
+      return response.ok;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: `Architect a formal board-ready proposal for ${lead.name} regarding the implementation of ${service.name}. 
+      Price: $${service.price}. Lead Context: ${lead.hiringContext}. User: ${profile.fullName}.
+      Return JSON: { executiveSummary, implementationPhases, valueProjection, emailBody, subject }.`,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            executiveSummary: { type: Type.STRING },
+            implementationPhases: { type: Type.STRING },
+            valueProjection: { type: Type.STRING },
+            emailBody: { type: Type.STRING },
+            subject: { type: Type.STRING }
+          },
+          required: ["executiveSummary", "implementationPhases", "valueProjection", "emailBody", "subject"]
+        }
+      }
+    });
+    return extractJson(response.text);
+  },
+
+  async generateVision(prompt: string) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: { parts: [{ text: prompt }] },
+      config: { imageConfig: { aspectRatio: "16:9" } }
+    });
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  },
+
+  async scoutClientLeads(niche: string, profile: UserProfile) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Identify 6 high-intent client nodes (agencies/publications) in the "${niche}" niche. Return JSON array: { companyName, website, description, type, opportunityScore }.`,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              companyName: { type: Type.STRING },
+              website: { type: Type.STRING },
+              description: { type: Type.STRING },
+              type: { type: Type.STRING, description: "One of: PUBLICATION, AGENCY, OTHER" },
+              opportunityScore: { type: Type.NUMBER }
+            },
+            required: ["companyName", "website", "description", "type", "opportunityScore"]
+          }
+        }
+      }
+    });
+    return extractJson(response.text) || [];
+  },
+
+  async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: `Generate a tailored high-authority pitch for ${companyName}. Context: ${description}. Persona: ${profile.fullName}. Profile DNA: ${profile.masterCV}. Return JSON: { subject, body, contactPersonStrategy }.`,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            subject: { type: Type.STRING },
+            body: { type: Type.STRING },
+            contactPersonStrategy: { type: Type.STRING }
+          },
+          required: ["subject", "body", "contactPersonStrategy"]
+        }
+      }
+    });
+    return extractJson(response.text);
   }
 };
