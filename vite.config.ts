@@ -1,4 +1,3 @@
-
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -29,6 +28,7 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    allowedHosts: ["titan-kdn7.onrender.com"]
+  }
 });
-preview: {
-  allowedHosts: ["titan-kdn7.onrender.com"]
