@@ -30,3 +30,5 @@ export default defineConfig({
     },
   },
 });
+preview: {
+  allowedHosts: ["titan-kdn7.onrender.com"]
