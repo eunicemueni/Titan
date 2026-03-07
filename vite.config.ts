@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
+// TITAN_OS_SYNC_PULSE: 2026-03-07T14:52:00Z
+
 export default defineConfig({
   plugins: [
     react(),
@@ -29,6 +31,6 @@ export default defineConfig({
     },
   },
   preview: {
-    allowedHosts: ["titan-kdn7.onrender.com"]
+    allowedHosts: ["titan-kdn7.onrender.com"] // ✅ inside the defineConfig block
   }
 });
