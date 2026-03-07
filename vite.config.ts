@@ -10,7 +10,6 @@ export default defineConfig({
     tailwindcss(),
   ],
   define: {
-    // Priority: 1. Environment Variable, 2. Local fallback
     'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || process.env.API_KEY || ''),
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY || process.env.GEMINI_API_KEY || ''),
     'process.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || ''),
@@ -31,6 +30,6 @@ export default defineConfig({
     },
   },
   preview: {
-    allowedHosts: ["titan-kdn7.onrender.com"] // ✅ only once, correctly inside defineConfig
+    allowedHosts: ["titan-kdn7.onrender.com"] // ✅ only one line, correctly inside defineConfig
   }
 });
