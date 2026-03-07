@@ -1,6 +1,7 @@
 
+// TITAN OS - Autonomous Career & Business Operating System
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord, AppAnalytics } from './types';
+import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord } from './types';
 import Dashboard from './modules/Dashboard';
 import MissionControl from './modules/MissionControl';
 import ScraperNode from './modules/JobAutopilot';
@@ -19,6 +20,7 @@ import MobileNav from './MobileNav';
 import GlobalSearchModal from './components/GlobalSearchModal';
 import { INITIAL_TELEMETRY } from './constants';
 import { supabaseService } from './services/supabaseService';
+import { geminiService } from './services/geminiService';
 
 const HARDCODED_PROFILES: UserProfile[] = [
   {
@@ -71,7 +73,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isAutopilotActive, setIsAutopilotActive] = useState(false);
-  const [targetDailyCap, setTargetDailyCap] = useState(250);
+  const [targetDailyCap, setTargetDailyCap] = useState(2000);
   const [logs, setLogs] = useState<TelemetryLog[]>(INITIAL_TELEMETRY);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [consoleOpen, setConsoleOpen] = useState(false);
@@ -125,11 +127,6 @@ const App: React.FC = () => {
 
   const currentProfile = useMemo(() => profiles[activeIndex] || profiles[0], [profiles, activeIndex]);
 
-  const handleNavigate = (view: AppView) => {
-    setCurrentView(view);
-    window.scrollTo(0, 0);
-  };
-
   const handleSentRecord = useCallback((record: Omit<SentRecord, 'id' | 'timestamp' | 'status'>) => {
     const newRecord: SentRecord = { ...record, id: `sent-${Date.now()}`, timestamp: Date.now(), status: 'DISPATCHED' };
     setSentRecords(prev => {
@@ -149,6 +146,75 @@ const App: React.FC = () => {
       return next;
     });
   }, [activeIndex]);
+
+  // AUTOPILOT CORE ENGINE: Process Queued Jobs
+  useEffect(() => {
+    if (!isAutopilotActive) return;
+
+    const processQueue = async () => {
+      const queuedJob = jobs.find(j => j.status === 'queued');
+      if (!queuedJob) return;
+
+      addLog(`AUTOPILOT: Processing node ${queuedJob.company}...`, "info");
+      
+      // 1. Mark as tailoring
+      setJobs(prev => prev.map(j => j.id === queuedJob.id ? { ...j, status: 'tailoring' } : j));
+
+      try {
+        // 2. Deep Scrape for contact info if missing
+        let email = queuedJob.contactEmail;
+        let manager = "Hiring Manager";
+        
+        if (!email || email === "Not Found") {
+          addLog(`DEEP_SCAN: Locating decision maker at ${queuedJob.company}...`, "info");
+          const contact = await geminiService.performDeepEmailScrape(queuedJob.company, queuedJob.sourceUrl || queuedJob.company);
+          email = contact.email;
+          manager = contact.personName;
+        }
+
+        // 3. Tailor Package
+        addLog(`NEURAL_SYNTH: Architecting tailored DNA for ${queuedJob.role}...`, "info");
+        const pkg = await geminiService.tailorJobPackage(queuedJob.role, queuedJob.company, currentProfile, "JOB", manager);
+
+        // 4. Mark as applying
+        setJobs(prev => prev.map(j => j.id === queuedJob.id ? { 
+          ...j, 
+          status: 'applying',
+          contactEmail: email,
+          tailoredPackage: pkg
+        } : j));
+
+        // 5. Dispatch
+        addLog(`UPLINK: Transmitting application to ${email}...`, "info");
+        const success = await geminiService.triggerRealDispatch(email || 'hr@target.com', pkg.subject, pkg.emailBody, 'JOB_APPLICATION');
+
+        if (success) {
+          addLog(`MISSION_SUCCESS: Node ${queuedJob.company} captured.`, "success");
+          setJobs(prev => prev.map(j => j.id === queuedJob.id ? { ...j, status: 'completed' } : j));
+          handleSentRecord({
+            type: 'JOB_APPLICATION',
+            recipient: queuedJob.company,
+            subject: pkg.subject,
+            industry: 'GENERAL'
+          });
+          updateStats({ coldEmailsSent: (currentProfile.stats.coldEmailsSent || 0) + 1 });
+        } else {
+          throw new Error("Dispatch failed");
+        }
+      } catch (err) {
+        addLog(`MISSION_CRASH: Node ${queuedJob.company} failed. Re-queueing...`, "error");
+        setJobs(prev => prev.map(j => j.id === queuedJob.id ? { ...j, status: 'queued' } : j));
+      }
+    };
+
+    const interval = setInterval(processQueue, 8000); // 8s interval to avoid rate limits
+    return () => clearInterval(interval);
+  }, [isAutopilotActive, jobs, currentProfile, addLog, handleSentRecord, updateStats]);
+
+  const handleNavigate = (view: AppView) => {
+    setCurrentView(view);
+    window.scrollTo(0, 0);
+  };
 
   const renderView = () => {
     const basicProps = { 

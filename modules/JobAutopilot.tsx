@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { JobRecord, UserProfile, TelemetryLog, SentRecord } from '../types';
-import { geminiService } from '../services/geminiService';
+import { scrapingService } from '../services/scrapingService';
 import SwipeDeploy from '../components/SwipeDeploy';
 
 interface ScraperNodeProps {
@@ -18,16 +18,16 @@ interface ScraperNodeProps {
 }
 
 const ScraperNode: React.FC<ScraperNodeProps> = ({ 
-  profile, 
+  profile: _profile, 
   onLog, 
   setJobs, 
   jobs, 
-  updateStats, 
-  onSent, 
+  updateStats: _updateStats, 
+  onSent: _onSent, 
   onBack, 
-  bridgeStatus, 
-  onReconnect, 
-  targetDailyCap 
+  bridgeStatus: _bridgeStatus, 
+  onReconnect: _onReconnect, 
+  targetDailyCap: _targetDailyCap 
 }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -62,21 +62,14 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({
     onLog(`SCAN: Targeting ${query} nodes (Global Uplink)...`, 'info');
     
     try {
-      const results = await geminiService.performUniversalScrape(query, location);
-      const mapped: JobRecord[] = results.map((j: any, i: number) => ({
-        id: `gem-${Date.now()}-${i}`,
-        company: j.company || "Target Node",
-        role: j.role || query,
-        location: j.location || location,
-        description: j.description || "Operational data source synchronized via Gemini Grounding.",
-        sourceUrl: j.sourceUrl || "",
+      const results = await scrapingService.precisionGoogleSearch(query, location);
+      const mapped: JobRecord[] = results.map((j: any) => ({
+        ...j,
         status: 'discovered' as const,
         timestamp: Date.now(),
-        matchScore: 90 + Math.floor(Math.random() * 10),
-        metadata: j.metadata
       }));
 
-      setJobs(prev => [...mapped, ...prev].slice(0, 200));
+      setJobs(prev => [...mapped, ...prev].slice(0, 2000));
       onLog(`Captured ${mapped.length} nodes via Global Relay.`, 'success');
     } catch (err: any) { 
       onLog("Discovery scan interrupted.", "warning"); 

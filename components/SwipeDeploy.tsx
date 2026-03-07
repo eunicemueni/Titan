@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 
 interface SwipeDeployProps {
   onConfirm: () => void;
@@ -11,7 +11,6 @@ const SwipeDeploy: React.FC<SwipeDeployProps> = ({ onConfirm, onCancel, label, t
   const [swipeX, setSwipeX] = useState(0);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
 
   const themeClasses = {
     amber: 'bg-amber-500 shadow-amber-500/50',

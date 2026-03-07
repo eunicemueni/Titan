@@ -19,9 +19,9 @@ interface MissionControlProps {
 }
 
 const MissionControl: React.FC<MissionControlProps> = ({ 
-  profile, 
+  profile: _profile, 
   onLog, 
-  onSent,
+  onSent: _onSent,
   onBack,
   jobs, 
   setJobs, 
@@ -47,37 +47,38 @@ const MissionControl: React.FC<MissionControlProps> = ({
       return;
     }
 
-    const interval = setInterval(() => {
-      const pendingJobs = jobs.filter(j => j.status === 'discovered' || j.status === 'queued');
-      if (pendingJobs.length === 0) return;
+    // Real-time mission feed from actual job states
+    const activeJobs = jobs.filter(j => j.status === 'tailoring' || j.status === 'applying' || j.status === 'completed');
+    const latestJob = activeJobs[activeJobs.length - 1];
 
-      const randomJob = pendingJobs[Math.floor(Math.random() * pendingJobs.length)];
-      const opCode = Math.random().toString(16).substring(2, 8).toUpperCase();
-      const isShadow = !randomJob.sourceUrl; 
-      
-      const newMission: Mission = {
-        id: `miss-${Date.now()}`,
-        target: randomJob.company,
-        status: 'ACTIVE' as const,
-        log: `[0x${opCode}] ${isShadow ? 'SHADOW_INFILTRATION' : 'PUBLIC_RELAY'} -> ${randomJob.company.toUpperCase()}...`,
-        timestamp: Date.now()
-      };
+    if (latestJob) {
+      const opCode = latestJob.id.split('-').pop()?.toUpperCase() || 'CORE';
+      let log = '';
+      let status: Mission['status'] = 'ACTIVE';
 
-      setLiveMissions(prev => [...prev, newMission].slice(-50));
-      
-      if (Math.random() > 0.85) {
-        const compMission: Mission = {
-          id: `comp-${Date.now()}`,
-          target: randomJob.company,
-          status: 'SUCCESS' as const,
-          log: `[0x${opCode}] MISSION_COMPLETE: Application Node Transmitted.`,
-          timestamp: Date.now()
-        };
-        setLiveMissions(prev => [...prev, compMission].slice(-50));
+      if (latestJob.status === 'tailoring') {
+        log = `[0x${opCode}] NEURAL_SYNTH: Mutating identity DNA for ${latestJob.company}...`;
+      } else if (latestJob.status === 'applying') {
+        log = `[0x${opCode}] UPLINK: Transmitting application to ${latestJob.contactEmail || 'TARGET_NODE'}...`;
+      } else if (latestJob.status === 'completed') {
+        log = `[0x${opCode}] MISSION_COMPLETE: Node ${latestJob.company} captured.`;
+        status = 'SUCCESS';
       }
-    }, 2000);
 
-    return () => clearInterval(interval);
+      if (log) {
+        setLiveMissions(prev => {
+          // Avoid duplicate logs for the same state
+          if (prev.length > 0 && prev[prev.length - 1].log === log) return prev;
+          return [...prev, {
+            id: `miss-${Date.now()}`,
+            target: latestJob.company,
+            status,
+            log,
+            timestamp: Date.now()
+          }].slice(-50);
+        });
+      }
+    }
   }, [isAutopilot, jobs]);
 
   const handleManualDispatch = (job: JobRecord) => {
@@ -220,7 +221,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pr-2">
-                 {queuedJobs.map((job, idx) => (
+                 {queuedJobs.map((job, _idx) => (
                    <div key={job.id} className="p-6 bg-black border border-white/5 rounded-3xl space-y-4 group hover:border-amber-500/30 transition-all">
                       <div className="flex justify-between items-center">
                          <span className="text-[10px] font-black text-white uppercase italic truncate max-w-[120px]">{job.company}</span>

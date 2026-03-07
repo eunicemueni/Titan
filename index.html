@@ -4,101 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>TITAN Command AI | Multi-Persona OS</title>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      // Global shims for browser environment
-      window.process = { 
-        env: { 
-          NODE_ENV: 'development',
-          API_KEY: '' // Will be populated by Vite define or environment
-        },
-        nextTick: (fn) => setTimeout(fn, 0),
-        browser: true 
-      };
-      window.global = window;
-
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              titan: {
-                bg: '#02040a',
-                surface: '#0d1117',
-                border: '#30363d',
-                primary: '#6366f1',
-                accent: '#a855f7'
-              }
-            }
-          }
-        }
-      };
-    </script>
-    <style>
-        body, html {
-            margin: 0; padding: 0;
-            background: #02040a !important;
-            color: #f8fafc;
-            overflow: hidden;
-            width: 100vw; height: 100vh;
-            -webkit-font-smoothing: antialiased;
-            font-family: 'Inter', sans-serif;
-        }
-        #root { width: 100%; height: 100%; position: relative; z-index: 1; }
-        .scanline::before {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%);
-            z-index: 9999;
-            background-size: 100% 2px;
-            pointer-events: none;
-            opacity: 0.1;
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.3; transform: scale(0.98); }
-        }
-        .boot-pulse { animation: pulse 2.5s infinite ease-in-out; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
-    </style>
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "@google/genai": "https://esm.sh/@google/genai@0.3.1",
-    "recharts": "https://esm.sh/recharts@2.15.0?external=react,react-dom",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "express": "https://esm.sh/express@^5.2.1",
-    "http": "https://esm.sh/http@^0.0.1-security",
-    "cors": "https://esm.sh/cors@^2.8.6",
-    "path": "https://esm.sh/path@^0.12.7",
-    "url": "https://esm.sh/url@^0.11.4",
-    "bullmq": "https://esm.sh/bullmq@^5.69.1",
-    "ioredis": "https://esm.sh/ioredis@^5.9.3",
-    "puppeteer-core": "https://esm.sh/puppeteer-core@^24.37.3",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4"
-  }
-}
-</script>
 </head>
 <body class="bg-[#02040a] scanline">
     <div id="root">
-      <div style="height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #02040a; color: #6366f1; font-family: 'JetBrains Mono', monospace;">
+      <div style="height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #02040a; color: #6366f1; font-family: 'JetBrains Mono', monospace;">
         <div class="boot-pulse" style="display: flex; flex-direction: column; align-items: center;">
           <div style="font-size: 32px; font-weight: 900; margin-bottom: 20px; font-style: italic; color: #fff; letter-spacing: -1px;">TITAN OS</div>
           <div id="boot-status" style="font-size: 10px; color: #4b5563; letter-spacing: 4px; font-weight: 700; text-transform: uppercase;">AWAITING_BRIDGE_UPLINK</div>
         </div>
       </div>
     </div>
-    <script type="module" src="./index.tsx"></script>
+    <script type="module" src="/index.tsx"></script>
 </body>
 </html>

@@ -23,7 +23,6 @@ const MarketNexus: React.FC<{
 }> = ({ profile, onLog, onSent, updateStats, onBack }) => {
   const [activeTab, setActiveTab] = useState<'SCOUT' | 'PIPELINE' | 'CATALOG'>('CATALOG');
   const [scouting, setScouting] = useState(false);
-  const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [leads, setLeads] = useState<EnrichedLead[]>([]);
   const [selectedService, setSelectedService] = useState<ServiceBlueprint | null>(SERVICE_CATALOG[0]);
   const [dispatchingLead, setDispatchingLead] = useState<EnrichedLead | null>(null);
@@ -66,7 +65,6 @@ const MarketNexus: React.FC<{
   };
 
   const handleEnrichLead = async (lead: EnrichedLead) => {
-    setEnrichingId(lead.id);
     onLog(`DEEP TRACE: Scraping decision-maker nodes at ${lead.name}...`, 'info');
     try {
       const domain = lead.website.replace('https://', '').replace('http://', '').split('/')[0];
@@ -81,7 +79,7 @@ const MarketNexus: React.FC<{
     } catch (err: any) {
       onLog(err.message, 'error');
     } finally {
-      setEnrichingId(null);
+      // Enrichment complete
     }
   };
 

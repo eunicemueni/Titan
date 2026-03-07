@@ -1,5 +1,5 @@
 
-import React, { useMemo, useEffect, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { UserProfile, JobRecord, AppView, SentRecord, AppAnalytics, TelemetryLog, QueueStatus } from '../types';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 import { geminiService, decodeAudioData } from '../services/geminiService';
@@ -208,7 +208,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                    <span className="text-sm font-black text-white">{targetDailyCap}</span>
                 </div>
                 <input 
-                  type="range" min="10" max="500" value={targetDailyCap} 
+                  type="range" min="10" max="2000" value={targetDailyCap} 
                   onChange={(e) => setTargetDailyCap(parseInt(e.target.value))}
                   className="w-full accent-indigo-500 h-1 bg-slate-900 rounded-full appearance-none cursor-pointer"
                 />

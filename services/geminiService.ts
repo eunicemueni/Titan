@@ -78,13 +78,28 @@ export const geminiService = {
   },
 
   async performUniversalScrape(industry: string, location: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return JSON array with: company, role, description, sourceUrl, location.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }]
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              company: { type: Type.STRING },
+              role: { type: Type.STRING },
+              description: { type: Type.STRING },
+              sourceUrl: { type: Type.STRING },
+              location: { type: Type.STRING }
+            },
+            required: ["company", "role", "description", "sourceUrl", "location"]
+          }
+        }
       }
     });
     
@@ -101,19 +116,19 @@ export const geminiService = {
   },
 
   async scoutCorporateNodesWithMaps(industry: string, region: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: `Find headquarters and physical office locations for ${industry} companies in ${region}.`,
       config: {
-        tools: [{ googleMaps: {} }],
+        tools: [{ googleMaps: {} } as any],
       },
     });
     
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     return groundingChunks
-      .filter(chunk => chunk.maps)
-      .map(chunk => ({
+      .filter((chunk: any) => chunk.maps)
+      .map((chunk: any) => ({
         name: chunk.maps?.title || "Corporate Node",
         address: chunk.maps?.title || "Location identified",
         uri: chunk.maps?.uri || ""
@@ -121,7 +136,7 @@ export const geminiService = {
   },
 
   async analyzeOperationalGaps(industry: string, location: string, persona: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Analyze operational logic gaps for companies in ${industry} at ${location}. Persona: ${persona}. Return JSON array of YieldNode objects: {company, website, gaps, solution, projectedValue, complexity}.`,
@@ -141,14 +156,15 @@ export const geminiService = {
             },
             required: ["company", "website", "gaps", "solution", "projectedValue", "complexity"]
           }
-        }
+        },
+        systemInstruction: SYSTEM_INSTRUCTION
       }
     });
     return extractJson(response.text) || [];
   },
 
   async generateB2BPitch(company: string, gaps: string[], solution: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Generate a high-authority B2B pitch for ${company}. Gaps: ${gaps.join(', ')}. Solution: ${solution}. Profile: ${profile.fullName}.`,
@@ -157,10 +173,10 @@ export const geminiService = {
     return response.text;
   },
 
-  async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, type: string, hiringManager: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  async tailorJobPackage(jobTitle: string, companyName: string, profile: UserProfile, _type: string, hiringManager: string) {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3.1-pro-preview',
       contents: `Generate high-authority tailored package for ${jobTitle} at ${companyName}. Master DNA: ${profile.masterCV}. Manager: ${hiringManager}. Return JSON: {cv, coverLetter, emailBody, subject}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -181,7 +197,7 @@ export const geminiService = {
   },
 
   async generateStrategicBriefing(profile: UserProfile, jobCount: number, revenue: number) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const prompt = `Strategic briefing for ${profile.fullName}: Systems stable. Discovery nodes: ${jobCount}. Pending yield: $${revenue}. Advise on B2B expansion.`;
 
     const response = await ai.models.generateContent({
@@ -201,7 +217,7 @@ export const geminiService = {
   },
 
   async connectLive(onTranscription: (text: string) => void, onTurnComplete: () => void) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     let currentInputTranscription = '';
     let currentOutputTranscription = '';
 
@@ -230,20 +246,21 @@ export const geminiService = {
           });
         },
         onmessage: async (message: LiveServerMessage) => {
-          if (message.serverContent?.outputTranscription) {
-            currentOutputTranscription += message.serverContent.outputTranscription.text;
+          const content = message.serverContent as any;
+          if (content?.outputTranscription) {
+            currentOutputTranscription += content.outputTranscription.text;
             onTranscription(currentOutputTranscription);
-          } else if (message.serverContent?.inputTranscription) {
-            currentInputTranscription += message.serverContent.inputTranscription.text;
+          } else if (content?.inputTranscription) {
+            currentInputTranscription += content.inputTranscription.text;
           }
 
-          if (message.serverContent?.turnComplete) {
+          if (content?.turnComplete) {
             onTurnComplete();
             currentInputTranscription = '';
             currentOutputTranscription = '';
           }
 
-          const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+          const base64Audio = content?.modelTurn?.parts?.[0]?.inlineData?.data;
           if (base64Audio) {
             const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
             const decodedBytes = decode(base64Audio);
@@ -271,44 +288,67 @@ export const geminiService = {
         responseModalities: [Modality.AUDIO],
         outputAudioTranscription: {},
         inputAudioTranscription: {},
-        systemInstruction: SYSTEM_INSTRUCTION,
+        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
         }
-      }
+      } as any
     });
     activeSessionPromise = sessionPromise;
     return sessionPromise;
   },
 
   async performDeepEmailScrape(companyName: string, domain: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Search for corporate contact email and manager name for ${companyName} (${domain}). Return JSON: {email, personName}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }]
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            email: { type: Type.STRING },
+            personName: { type: Type.STRING }
+          },
+          required: ["email", "personName"]
+        }
       }
     });
     return extractJson(response.text) || { email: "Not Found", personName: "Decision Maker" };
   },
 
   async scoutNexusLeads(industry: string, location: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Identify 6 corporations in ${industry} (${location}). Return JSON array: {name, website, email, hiringContext}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }]
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              website: { type: Type.STRING },
+              email: { type: Type.STRING },
+              hiringContext: { type: Type.STRING }
+            },
+            required: ["name", "website", "email", "hiringContext"]
+          }
+        }
       }
     });
     return extractJson(response.text) || [];
   },
 
   async scoutFlashGigs(profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Search freelance gigs for ${profile.domain}. Return JSON array.`,
@@ -321,7 +361,7 @@ export const geminiService = {
   },
 
   async processConsoleCommand(command: string, profile: UserProfile): Promise<string> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Command: "${command}". Profile: ${profile.fullName}.`,
@@ -345,9 +385,9 @@ export const geminiService = {
   },
 
   async generateMarketNexusPitch(lead: any, service: any, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3.1-pro-preview',
       contents: `Architect a formal board-ready proposal for ${lead.name} regarding the implementation of ${service.name}. 
       Price: $${service.price}. Lead Context: ${lead.hiringContext}. User: ${profile.fullName}.
       Return JSON: { executiveSummary, implementationPhases, valueProjection, emailBody, subject }.`,
@@ -371,11 +411,13 @@ export const geminiService = {
   },
 
   async generateVision(prompt: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: "16:9" } }
+      config: { 
+        imageConfig: { aspectRatio: "16:9" } 
+      } as any
     });
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
@@ -385,8 +427,8 @@ export const geminiService = {
     return null;
   },
 
-  async scoutClientLeads(niche: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  async scoutClientLeads(niche: string, _profile: UserProfile) {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Identify 6 high-intent client nodes (agencies/publications) in the "${niche}" niche. Return JSON array: { companyName, website, description, type, opportunityScore }.`,
@@ -414,9 +456,9 @@ export const geminiService = {
   },
 
   async tailorClientPitch(companyName: string, description: string, profile: UserProfile) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3.1-pro-preview',
       contents: `Generate a tailored high-authority pitch for ${companyName}. Context: ${description}. Persona: ${profile.fullName}. Profile DNA: ${profile.masterCV}. Return JSON: { subject, body, contactPersonStrategy }.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,

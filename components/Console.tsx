@@ -16,7 +16,7 @@ interface ConsoleProps {
 }
 
 const Console: React.FC<ConsoleProps> = ({ 
-  isOpen, onClose, profile, onLog, autopilot, setAutopilot, dailyCap, setDailyCap, setView, evasionStatus 
+  isOpen, onClose, profile, onLog, autopilot, setAutopilot, dailyCap, setDailyCap, setView
 }) => {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<{ text: string; type: 'cmd' | 'resp' | 'sys' }[]>([

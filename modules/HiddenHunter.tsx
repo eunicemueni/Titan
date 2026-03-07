@@ -16,7 +16,7 @@ interface HiddenHunterProps {
   evasionStatus: string;
 }
 
-const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats, onSent, companies, setCompanies, onBack, targetDailyCap, evasionStatus }) => {
+const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats: _updateStats, onSent, companies, setCompanies, onBack, targetDailyCap: _targetDailyCap, evasionStatus }) => {
   const [loading, setLoading] = useState(false);
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [industry, setIndustry] = useState('');

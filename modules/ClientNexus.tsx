@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { UserProfile, TelemetryLog, SentRecord, ClientLead } from '../types';
 import { geminiService } from '../services/geminiService';
 

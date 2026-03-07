@@ -1,5 +1,4 @@
 
-import React from 'react';
 import { TelemetryLog } from './types';
 
 export const SYSTEM_NAME = "TITAN COMMAND AI";

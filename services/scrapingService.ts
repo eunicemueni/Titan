@@ -14,8 +14,8 @@ export const scrapingService = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: `${query} jobs in ${location}` }),
-        // Set a low timeout to pivot quickly if the server doesn't exist
-        signal: AbortSignal.timeout(3000) 
+        // Increased timeout for Puppeteer
+        signal: AbortSignal.timeout(15000) 
       });
 
       if (response.ok) {

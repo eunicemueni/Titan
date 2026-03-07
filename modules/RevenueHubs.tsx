@@ -41,7 +41,7 @@ const RevenueHubs: React.FC<{
   onSent: (record: Omit<SentRecord, 'id' | 'timestamp' | 'status'>) => void; 
   updateStats: (updates: Partial<UserProfile['stats']>) => void; 
   onBack: () => void; 
-}> = ({ profile, onLog, onSent, updateStats, onBack }) => {
+}> = ({ profile, onLog, onSent, updateStats: _updateStats, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [sector, setSector] = useState('');
   const [results, setResults] = useState<YieldNode[]>([]);

@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { UserProfile, TelemetryLog, SentRecord } from '../types';
+import React, { useState } from 'react';
+import { UserProfile, TelemetryLog } from '../types';
 import { geminiService } from '../services/geminiService';
 
 interface FlashGig {
