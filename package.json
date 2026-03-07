@@ -1,7 +1,7 @@
 {
   "name": "titan-os-command-ai",
   "version": "7.0.1",
-  "description": "Autonomous Career & Business Operating System",
+  "description": "Autonomous Career & Business Operating System - SYNC_PULSE_701",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",

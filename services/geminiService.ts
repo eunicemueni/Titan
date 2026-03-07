@@ -1,3 +1,4 @@
+// TITAN_OS_NEURAL_PULSE: 2026-03-07T14:52:00Z
 import { GoogleGenAI, Type, Modality, GenerateContentResponse, LiveServerMessage } from "@google/genai";
 import { UserProfile } from "../types";
 
