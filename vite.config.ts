@@ -29,7 +29,7 @@ export default defineConfig({
       },
     },
   },
-  preview: {
-    allowedHosts: ["titan-kdn7.onrender.com"] // ✅ only one line, correctly inside defineConfig
+    preview: {
+    allowedHosts: ["titan-kdn7.onrender.com"]
   }
 });
