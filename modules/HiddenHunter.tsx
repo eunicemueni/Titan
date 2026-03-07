@@ -63,17 +63,22 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
         company.name, 
         profile, 
         'cold', 
-        company.hiringManager || 'Strategic Lead'
+        company.hiringManager || 'Decision Maker'
       );
       
       const subject = pkg.subject || `Strategic Alignment: ${industry} - ${profile.fullName}`;
       
-      const realSent = await geminiService.triggerRealDispatch(company.email, subject, pkg.emailBody, 'COL_OUTREACH');
+      // Construct a full body for the dispatch that includes the pitch, cover letter, and a reference to the CV
+      const fullBody = `${pkg.emailBody}\n\n---\nCOVER LETTER:\n${pkg.coverLetter}\n\n---\nTAILORED CV:\n${pkg.cv}`;
+
+      const realSent = await geminiService.triggerRealDispatch(company.email, subject, fullBody, 'COL_OUTREACH');
       
       if (realSent) {
-        onLog(`SERVER_RELAY: Global dispatch transmitted.`, "success");
+        onLog(`SERVER_RELAY: Global dispatch transmitted with all assets.`, "success");
       } else {
-        window.open(`mailto:${company.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(pkg.emailBody || '')}`, '_blank');
+        // Mailto fallback - we include the pitch and links
+        const mailtoBody = `${pkg.emailBody}\n\n[Note: CV and Cover Letter text are included in the system audit log for this mission]`;
+        window.open(`mailto:${company.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`, '_blank');
       }
 
       const updated = { ...company, tailoredPackage: pkg, status: 'SENT' };
@@ -112,16 +117,29 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7"/></svg>
                BACK TO HUNTER HUB
             </button>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-               <div className="bg-titan-surface border border-cyan-500/20 p-12 rounded-[4rem] shadow-2xl">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+               <div className="bg-titan-surface border border-cyan-500/20 p-8 rounded-[3rem] shadow-2xl flex flex-col">
                   <h3 className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-6">Autonomous Pitch</h3>
-                  <div className="text-sm font-serif italic text-slate-300 leading-relaxed whitespace-pre-wrap h-[500px] overflow-y-auto custom-scrollbar">
+                  <div className="text-xs font-serif italic text-slate-300 leading-relaxed whitespace-pre-wrap flex-1 overflow-y-auto custom-scrollbar pr-4">
                      {viewingPackage.tailoredPackage?.emailBody}
                   </div>
+                  <div className="mt-6 pt-6 border-t border-white/5">
+                     <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-2">Linked Assets:</p>
+                     <div className="flex flex-col gap-2">
+                        <a href={profile.portfolioUrl} target="_blank" className="text-[9px] text-cyan-500 hover:underline truncate">Portfolio: {profile.portfolioUrl}</a>
+                        <a href={profile.linkedinUrl} target="_blank" className="text-[9px] text-indigo-500 hover:underline truncate">LinkedIn: {profile.linkedinUrl}</a>
+                     </div>
+                  </div>
                </div>
-               <div className="bg-white border border-slate-200 p-12 rounded-[4rem] shadow-2xl">
-                  <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-6">Tailored CV Overlay</h3>
-                  <div className="text-[10px] font-mono text-slate-800 leading-relaxed whitespace-pre-wrap h-[500px] overflow-y-auto custom-scrollbar">
+               <div className="bg-white border border-slate-200 p-8 rounded-[3rem] shadow-2xl">
+                  <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-6">Tailored Cover Letter</h3>
+                  <div className="text-[11px] font-serif text-slate-800 leading-relaxed whitespace-pre-wrap h-[500px] overflow-y-auto custom-scrollbar pr-4">
+                     {viewingPackage.tailoredPackage?.coverLetter}
+                  </div>
+               </div>
+               <div className="bg-slate-900 border border-white/5 p-8 rounded-[3rem] shadow-2xl">
+                  <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6">Tailored CV Overlay</h3>
+                  <div className="text-[9px] font-mono text-slate-400 leading-relaxed whitespace-pre-wrap h-[500px] overflow-y-auto custom-scrollbar pr-4">
                      {viewingPackage.tailoredPackage?.cv}
                   </div>
                </div>

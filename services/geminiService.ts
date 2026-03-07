@@ -177,7 +177,20 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3.1-pro-preview',
-      contents: `Generate high-authority tailored package for ${jobTitle} at ${companyName}. Master DNA: ${profile.masterCV}. Manager: ${hiringManager}. Return JSON: {cv, coverLetter, emailBody, subject}.`,
+      contents: `Generate a high-authority tailored job application package for the role of ${jobTitle} at ${companyName}. 
+      
+      USER_DNA: ${profile.masterCV}
+      PORTFOLIO: ${profile.portfolioUrl}
+      LINKEDIN: ${profile.linkedinUrl}
+      MANAGER: ${hiringManager}
+
+      REQUIREMENTS:
+      1. The 'emailBody' MUST include a professional pitch and explicitly link to the Portfolio (${profile.portfolioUrl}) and LinkedIn (${profile.linkedinUrl}).
+      2. The 'cv' should be a tailored version of the Master CV.
+      3. The 'coverLetter' should be a formal letter addressed to ${hiringManager}.
+      4. Mention that the CV and Cover Letter are attached to the communication.
+
+      Return JSON: {cv, coverLetter, emailBody, subject}.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",

@@ -186,7 +186,11 @@ const App: React.FC = () => {
 
         // 5. Dispatch
         addLog(`UPLINK: Transmitting application to ${email}...`, "info");
-        const success = await geminiService.triggerRealDispatch(email || 'hr@target.com', pkg.subject, pkg.emailBody, 'JOB_APPLICATION');
+        
+        // Construct a full body for the dispatch that includes the pitch, cover letter, and a reference to the CV
+        const fullBody = `${pkg.emailBody}\n\n---\nCOVER LETTER:\n${pkg.coverLetter}\n\n---\nTAILORED CV:\n${pkg.cv}`;
+        
+        const success = await geminiService.triggerRealDispatch(email || 'hr@target.com', pkg.subject, fullBody, 'JOB_APPLICATION');
 
         if (success) {
           addLog(`MISSION_SUCCESS: Node ${queuedJob.company} captured.`, "success");
