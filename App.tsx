@@ -1,5 +1,5 @@
 
-// TITAN OS - Autonomous Career & Business Operating System
+// TITAN OS - Autonomous Career & Business Operating System v7.0.1-PRO
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord } from './types';
 import Dashboard from './modules/Dashboard';
