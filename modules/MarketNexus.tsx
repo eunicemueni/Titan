@@ -20,7 +20,9 @@ const MarketNexus: React.FC<{
   onSent: (r: any) => void;
   updateStats: (updates: Partial<UserProfile['stats']>) => void;
   onBack: () => void;
-}> = ({ profile, onLog, onSent, updateStats, onBack }) => {
+  isAutoScout: boolean;
+  onToggleAutoScout: () => void;
+}> = ({ profile, onLog, onSent, updateStats, onBack, isAutoScout, onToggleAutoScout }) => {
   const [activeTab, setActiveTab] = useState<'SCOUT' | 'PIPELINE' | 'CATALOG'>('CATALOG');
   const [scouting, setScouting] = useState(false);
   const [leads, setLeads] = useState<EnrichedLead[]>([]);
@@ -28,9 +30,19 @@ const MarketNexus: React.FC<{
   const [dispatchingLead, setDispatchingLead] = useState<EnrichedLead | null>(null);
   const [previewingPitch, setPreviewingPitch] = useState<{lead: EnrichedLead, pitch: any, visionUrl?: string} | null>(null);
   const [visualizing, setVisualizing] = useState(false);
-  
   const [searchIndustry, setSearchIndustry] = useState('');
   const [searchLocation, setSearchLocation] = useState('Global');
+
+  // Auto-Scout Logic
+  React.useEffect(() => {
+    if (!isAutoScout) return;
+    const interval = setInterval(() => {
+      if (!scouting && searchIndustry) {
+        scoutTargets();
+      }
+    }, 60000); // Pulse every 60s
+    return () => clearInterval(interval);
+  }, [isAutoScout, scouting, searchIndustry]);
   
   const pipelineStats = useMemo(() => {
     const totalValue = leads.reduce((sum, l) => sum + (l.isSold ? 0 : (selectedService?.price || 0)), 0);
@@ -221,6 +233,16 @@ const MarketNexus: React.FC<{
                <button onClick={scoutTargets} disabled={scouting || !searchIndustry} className="w-full py-10 bg-white text-black rounded-[2.5rem] font-black uppercase text-sm tracking-[0.5em] hover:bg-indigo-600 hover:text-white transition-all shadow-2xl active:scale-[0.98]">
                  {scouting ? 'Synchronizing Cluster Nodes...' : `Identify Leads for ${selectedService?.name}`}
                </button>
+               
+               <div className="pt-6 flex items-center justify-center gap-4">
+                  <button 
+                    onClick={onToggleAutoScout} 
+                    className={`px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${isAutoScout ? 'bg-red-500 text-white border-red-400' : 'bg-slate-900 text-slate-500 border-white/5'}`}
+                  >
+                    {isAutoScout ? 'Terminate Auto-Scout' : 'Engage Neural Auto-Scout'}
+                  </button>
+                  <p className="text-[8px] font-black text-slate-700 uppercase tracking-widest">Autonomous Pulse: {isAutoScout ? 'ACTIVE' : 'STANDBY'}</p>
+               </div>
              </div>
           </div>
         </div>

@@ -80,6 +80,8 @@ const App: React.FC = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [bridgeStatus, setBridgeStatus] = useState<'OFFLINE' | 'ONLINE'>('OFFLINE');
+  const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
+  const [isMarketAutoScout, setIsMarketAutoScout] = useState(false);
 
   const addLog = useCallback((message: string, level: TelemetryLog['level'] = 'info') => {
     const newLog: TelemetryLog = { id: `log-${Date.now()}`, message, level, timestamp: Date.now() };
@@ -116,6 +118,7 @@ const App: React.FC = () => {
         if (cloudSent) setSentRecords(cloudSent);
         if (cloudProfiles && cloudProfiles.length > 0) {
           setProfiles(cloudProfiles);
+          setLastSyncTime(Date.now());
           addLog("IDENTITY: Global DNA synchronized.", "success");
         }
       } catch (err) {
@@ -142,7 +145,7 @@ const App: React.FC = () => {
       if (next[activeIndex]) {
         next[activeIndex] = { ...next[activeIndex], stats: { ...next[activeIndex].stats, ...updates } };
       }
-      supabaseService.saveProfiles(next);
+      supabaseService.saveProfiles(next).then(() => setLastSyncTime(Date.now()));
       return next;
     });
   }, [activeIndex]);
@@ -240,11 +243,11 @@ const App: React.FC = () => {
       case AppView.INCOME_B2B:
         return <RevenueHubs {...basicProps} updateStats={updateStats} />;
       case AppView.MARKET_NEXUS:
-        return <MarketNexus {...basicProps} updateStats={updateStats} />;
+        return <MarketNexus {...basicProps} updateStats={updateStats} isAutoScout={isMarketAutoScout} onToggleAutoScout={() => setIsMarketAutoScout(!isMarketAutoScout)} />;
       case AppView.CLIENT_NEXUS:
         return <ClientNexus {...basicProps} updateStats={updateStats} />;
       case AppView.PROFILE:
-        return <IdentityVault profiles={profiles} setProfiles={setProfiles} activeIndex={activeIndex} setActiveIndex={setActiveIndex} onLog={addLog} onTrack={() => {}} sentRecords={sentRecords} setSentRecords={setSentRecords} analytics={{agentDetections: 0, customCVsGenerated: 0, totalIncome: 0, lastPulse: Date.now(), activeLeads: 0, conversionRate: 0, concurrencyNodeCount: 0}} setAnalytics={() => {}} />;
+        return <IdentityVault profiles={profiles} setProfiles={setProfiles} activeIndex={activeIndex} setActiveIndex={setActiveIndex} onLog={addLog} onTrack={() => {}} sentRecords={sentRecords} setSentRecords={setSentRecords} analytics={{agentDetections: 0, customCVsGenerated: 0, totalIncome: 0, lastPulse: Date.now(), activeLeads: 0, conversionRate: 0, concurrencyNodeCount: 0}} setAnalytics={() => {}} lastSyncTime={lastSyncTime} setLastSyncTime={setLastSyncTime} />;
       case AppView.VAULT_SYNC:
         return <SystemDeploy onLog={addLog} bridgeStatus={bridgeStatus === 'ONLINE' ? 'ONLINE' : 'OFFLINE'} onReconnect={() => {}} />;
       default:

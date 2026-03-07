@@ -14,6 +14,8 @@ interface IdentityVaultProps {
   setSentRecords: (records: SentRecord[]) => void;
   analytics: AppAnalytics;
   setAnalytics: (analytics: AppAnalytics) => void;
+  lastSyncTime: number;
+  setLastSyncTime: (time: number) => void;
 }
 
 const IdentityVault: React.FC<IdentityVaultProps> = ({ 
@@ -22,6 +24,8 @@ const IdentityVault: React.FC<IdentityVaultProps> = ({
   activeIndex, 
   setActiveIndex, 
   onLog,
+  lastSyncTime,
+  setLastSyncTime
 }) => {
   const [editMode, setEditMode] = useState(false);
   const [viewMode, setViewMode] = useState<'EDIT' | 'DOSSIER' | 'DNA_STREAM'>('DNA_STREAM');
@@ -36,6 +40,7 @@ const IdentityVault: React.FC<IdentityVaultProps> = ({
       const success = await supabaseService.saveProfiles(profiles);
       if (success) {
         onLog("VAULT_SYNC: Cloud Node synchronized.", "success");
+        setLastSyncTime(Date.now());
         setEditMode(false);
       } else {
         onLog("VAULT_SYNC: Cloud Link Error.", "error");
@@ -93,7 +98,10 @@ const IdentityVault: React.FC<IdentityVaultProps> = ({
               <div className="bg-indigo-600/10 p-10 border-b border-white/5 flex justify-between items-center">
                  <div>
                     <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">Identity DNA Core</h3>
-                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-2">Uplink Persona: {activeProfile.fullName}</p>
+                    <div className="flex items-center gap-4 mt-2">
+                       <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Uplink Persona: {activeProfile.fullName}</p>
+                       <span className="text-[8px] font-mono text-slate-600 uppercase tracking-widest">Last Sync: {new Date(lastSyncTime).toLocaleTimeString()}</span>
+                    </div>
                  </div>
                  <div className="w-3 h-3 rounded-full bg-indigo-500 animate-pulse shadow-[0_0_8px_#6366f1]"></div>
               </div>
