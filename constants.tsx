@@ -41,11 +41,11 @@ export const SERVICE_CATALOG: ServiceBlueprint[] = [
   },
   {
     id: 'risk_nexus',
-    name: 'Stochastic Risk Nexus',
+    name: 'Stochastic Risk Nexus (Actuarial)',
     price: 1450,
-    description: 'Advanced actuarial and risk modeling framework. We clone your risk history into a 10-year mitigation map to eliminate liability friction.',
+    description: 'Advanced actuarial and risk modeling framework. We clone your risk history into a 10-year mitigation map to eliminate liability friction and optimize insurance premiums.',
     icon: '📈',
-    salesHook: "Identified significant liability exposure. My Risk Nexus framework provides a custom-cloned stochastic mitigation map. Engagement: $1,450."
+    salesHook: "Identified significant liability exposure. My Stochastic Risk Nexus framework provides a custom-cloned actuarial mitigation map. Engagement: $1,450."
   },
   {
     id: 'knowledge_brain',

@@ -1,4 +1,6 @@
 
+// Market Nexus - Corporate Acquisition Node
+// PLATFORM_SYNC_TOKEN: 2026-03-07-T13-48
 import React, { useState, useMemo } from 'react';
 import { UserProfile, TelemetryLog, TargetedCompany } from '../types';
 import { geminiService } from '../services/geminiService';
