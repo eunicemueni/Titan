@@ -2,7 +2,7 @@
 import { TelemetryLog } from './types';
 
 export const SYSTEM_NAME = "TITAN COMMAND AI";
-export const VERSION = "7.0.0-PRO";
+export const VERSION = "7.0.1-PRO";
 
 export const COLORS = {
   primary: '#6366f1',
