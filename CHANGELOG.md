@@ -9,3 +9,6 @@
 
 ### Fixed
 - Change detection issues for platform commits.
+- Backend production crash on Render via dynamic Vite imports.
+- Missing Chromium in Dockerfile for autonomous mission nodes.
+- Build dependency resolution for static site generation.
