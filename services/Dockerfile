@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libcairo2 \
     libasound2 \
+    chromium \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 

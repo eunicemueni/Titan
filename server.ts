@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import puppeteer from 'puppeteer-core';
-import { createServer as createViteServer } from 'vite';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -118,6 +117,7 @@ async function startServer() {
 
   // VITE MIDDLEWARE OR STATIC FILES
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

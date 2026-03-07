@@ -18,5 +18,5 @@
     "allowJs": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "server.ts", "types.ts", "constants.tsx", "App.tsx", "index.tsx", "modules", "components", "services"]
+  "include": ["server.ts", "types.ts", "constants.tsx", "App.tsx", "index.tsx", "modules", "components", "services"]
 }
