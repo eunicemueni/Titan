@@ -70,9 +70,13 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({
       }));
 
       setJobs(prev => [...mapped, ...prev].slice(0, 2000));
-      onLog(`Captured ${mapped.length} nodes via Global Relay.`, 'success');
+      if (mapped.length > 0) {
+        onLog(`Captured ${mapped.length} nodes via Global Relay.`, 'success');
+      } else {
+        onLog(`No nodes identified for "${query}". Try a broader industry term.`, 'warning');
+      }
     } catch (err: any) { 
-      onLog("Discovery scan interrupted.", "warning"); 
+      onLog("Discovery scan interrupted. Neural link unstable.", "error"); 
     } finally { 
       setIsScanning(false); 
     }

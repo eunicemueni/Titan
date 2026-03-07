@@ -78,41 +78,56 @@ export const geminiService = {
   },
 
   async performUniversalScrape(industry: string, location: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return JSON array with: company, role, description, sourceUrl, location.`,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              company: { type: Type.STRING },
-              role: { type: Type.STRING },
-              description: { type: Type.STRING },
-              sourceUrl: { type: Type.STRING },
-              location: { type: Type.STRING }
-            },
-            required: ["company", "role", "description", "sourceUrl", "location"]
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("TITAN_OS: GEMINI_API_KEY is missing from environment.");
+      return [];
+    }
+    
+    const ai = new GoogleGenAI({ apiKey: apiKey as string });
+    console.log(`TITAN_OS: Initiating Neural Scrape for ${industry} in ${location}...`);
+    
+    try {
+      const response: GenerateContentResponse = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return JSON array with: company, role, description, sourceUrl, location.`,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                company: { type: Type.STRING },
+                role: { type: Type.STRING },
+                description: { type: Type.STRING },
+                sourceUrl: { type: Type.STRING },
+                location: { type: Type.STRING }
+              },
+              required: ["company", "role", "description", "sourceUrl", "location"]
+            }
           }
         }
-      }
-    });
-    
-    const results = extractJson(response.text) || [];
-    const groundingSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    const sourceUrls = groundingSources
-      .filter(chunk => chunk.web?.uri)
-      .map(chunk => ({ title: chunk.web?.title || "Search Source", uri: chunk.web?.uri || "" }));
+      });
+      
+      const results = extractJson(response.text) || [];
+      console.log(`TITAN_OS: Neural Scrape complete. Found ${results.length} results.`);
+      
+      const groundingSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+      const sourceUrls = groundingSources
+        .filter(chunk => chunk.web?.uri)
+        .map(chunk => ({ title: chunk.web?.title || "Search Source", uri: chunk.web?.uri || "" }));
 
-    return results.map((job: any) => ({ 
-      ...job, 
-      metadata: { sources: sourceUrls } 
-    }));
+      return results.map((job: any) => ({ 
+        ...job, 
+        metadata: { sources: sourceUrls } 
+      }));
+    } catch (error) {
+      console.error("TITAN_OS: Neural Scrape failed:", error);
+      return [];
+    }
   },
 
   async scoutCorporateNodesWithMaps(industry: string, region: string) {

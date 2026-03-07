@@ -35,8 +35,8 @@ export const scrapingService = {
           }));
         }
       }
-    } catch (e) {
-      // Silent failover to Gemini Grounding
+    } catch (e: any) {
+      console.warn("TITAN_BRIDGE: Puppeteer Relay failed, falling back to Neural Grounding.", e.message);
     }
 
     // High-Velocity Neural Fallback (Deployment Safe)
