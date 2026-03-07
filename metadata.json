@@ -1,5 +1,5 @@
 {
-  "name": "TITAN OS",
+  "name": "TITAN COMMAND OS",
   "description": "Autonomous Career & Business Operating System with AI-driven job discovery, tailoring, and dispatching.",
   "requestFramePermissions": [
     "microphone"
