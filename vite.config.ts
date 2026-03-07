@@ -31,6 +31,6 @@ export default defineConfig({
     },
   },
   preview: {
-    allowedHosts: ["titan-kdn7.onrender.com"] // ✅ inside the defineConfig block
+    allowedHosts: ["titan-kdn7.onrender.com"] // ✅ only once, correctly inside defineConfig
   }
 });
