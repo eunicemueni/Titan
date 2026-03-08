@@ -28,10 +28,29 @@ async function startServer() {
 
   // TITAN AUTONOMOUS CORE INITIALIZATION
   try {
+    console.log(`TITAN_OS: Attempting Redis connection at ${REDIS_URL}...`);
     redisConnection = new IORedis(REDIS_URL, { 
       maxRetriesPerRequest: null,
-      connectTimeout: 20000,
-      tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined
+      connectTimeout: 10000,
+      retryStrategy: (times) => {
+        if (times > 2) {
+          console.warn('TITAN_REDIS: Max connection attempts reached. Automation core offline.');
+          return null; // Stop retrying
+        }
+        return Math.min(times * 500, 2000);
+      }
+    });
+
+    redisConnection.on('error', (err) => {
+      // Only log once to avoid spamming
+      if ((redisConnection as any)._loggedError) return;
+      console.warn('TITAN_REDIS_OFFLINE: Automation features (Queues/Workers) disabled.', err.message);
+      (redisConnection as any)._loggedError = true;
+    });
+
+    redisConnection.on('connect', () => {
+      console.log('TITAN_REDIS_ONLINE: Automation core synchronized.');
+      (redisConnection as any)._loggedError = false;
     });
 
     relayQueue = new Queue('RelayQueue', { connection: redisConnection });
@@ -41,7 +60,15 @@ async function startServer() {
       
       const browser = await puppeteer.launch({
         executablePath: PUPPETEER_PATH,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+        args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox', 
+          '--disable-dev-shm-usage', 
+          '--disable-gpu',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process'
+        ]
       });
 
       try {

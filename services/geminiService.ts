@@ -80,8 +80,8 @@ export const geminiService = {
 
   async performUniversalScrape(industry: string, location: string) {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error("TITAN_OS: GEMINI_API_KEY is missing from environment.");
+    if (!apiKey || apiKey === 'undefined') {
+      console.error("TITAN_OS: GEMINI_API_KEY is missing or invalid.");
       return [];
     }
     
@@ -91,29 +91,27 @@ export const geminiService = {
     try {
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Search Google for active 100% remote job openings in ${industry} (${location}). Return JSON array with: company, role, description, sourceUrl, location.`,
+        contents: `CRITICAL: Search Google for active 100% remote job openings for "${industry}" in "${location}". 
+        You MUST find at least 5 real, current job listings.
+        Return ONLY a raw JSON array of objects. 
+        Each object MUST have: company, role, description, sourceUrl, location.
+        DO NOT include any markdown formatting like \`\`\`json. Just the raw array.`,
         config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
+          systemInstruction: SYSTEM_INSTRUCTION + "\nOutput Format: Raw JSON Array. No text before or after.",
           tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                company: { type: Type.STRING },
-                role: { type: Type.STRING },
-                description: { type: Type.STRING },
-                sourceUrl: { type: Type.STRING },
-                location: { type: Type.STRING }
-              },
-              required: ["company", "role", "description", "sourceUrl", "location"]
-            }
-          }
         }
       });
       
-      const results = extractJson(response.text) || [];
+      const text = response.text?.trim() || "[]";
+      let results = [];
+      try {
+        // Try direct parse first
+        results = JSON.parse(text);
+      } catch (e) {
+        // Fallback to extraction
+        results = extractJson(text) || [];
+      }
+      
       console.log(`TITAN_OS: Neural Scrape complete. Found ${results.length} results.`);
       
       const groundingSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];

@@ -42,6 +42,9 @@ export const scrapingService = {
     // High-Velocity Neural Fallback (Deployment Safe)
     try {
       const results = await geminiService.performUniversalScrape(query, location);
+      if (results.length === 0) {
+        console.warn("TITAN_DISCOVERY: Neural Scrape returned 0 results. This may be due to safety filters or grounding limits.");
+      }
       return results.map((j: any, i: number) => ({
         id: `gem-job-${Date.now()}-${i}`,
         company: j.company || "Target Node",

@@ -91,6 +91,13 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="p-4 md:p-8 lg:p-12 xl:p-16 max-w-[1800px] mx-auto space-y-8 md:space-y-12 relative overflow-hidden">
+      {/* Neural Link Status Overlay */}
+      <div className="fixed bottom-4 left-4 z-[100] flex items-center gap-2 px-3 py-1.5 bg-black/80 border border-white/10 rounded-full backdrop-blur-md">
+        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${process.env.GEMINI_API_KEY ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-red-500 shadow-[0_0_8px_#ef4444]'}`}></div>
+        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+          Neural Link: {process.env.GEMINI_API_KEY ? 'ACTIVE' : 'OFFLINE'}
+        </span>
+      </div>
       <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20" xmlns="http://www.w3.org/2000/svg">
         <path d="M 10% 20% Q 30% 10% 50% 30% T 90% 20%" fill="none" stroke="url(#lineGradient)" strokeWidth="0.5" className="animate-pulse" />
         <defs>
