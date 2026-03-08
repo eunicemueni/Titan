@@ -139,7 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               <span className="text-[9px] font-black uppercase tracking-widest">{isBriefing ? 'Briefing Live' : 'Start Strategic Briefing'}</span>
            </button>
            <div className="flex flex-col items-end">
-              <span className="text-[8px] font-black text-indigo-500/50 uppercase tracking-widest">v7.0.1-PRO</span>
+              <span className="text-[8px] font-black text-indigo-500/50 uppercase tracking-widest">v7.0.2-STABLE</span>
               <span className="text-[8px] font-black text-slate-700 uppercase tracking-widest">Neural Status</span>
               <div className="flex items-center gap-2">
                  <span className={`w-1.5 h-1.5 rounded-full ${hubOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>

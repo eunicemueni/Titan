@@ -66,6 +66,14 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({
     setShowSwipe(false);
   };
 
+  const handleApplyAll = () => {
+    if (visibleJobs.length === 0) return;
+    onLog(`DEPLOYING: Committing ALL ${visibleJobs.length} nodes to bridge...`, "info");
+    setJobs(prev => prev.map(j => j.status === 'discovered' ? { ...j, status: 'queued' } : j));
+    onLog(`SUCCESS: Global UHF Dispatch triggered.`, "success");
+    setSelectedIds(new Set());
+  };
+
   const handleGlobalScrape = async () => {
     if (!query) return;
     setIsScanning(true);
@@ -127,9 +135,14 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({
           <div className="flex items-center gap-3 md:gap-6">
             <h3 className="text-[8px] md:text-xs font-black text-slate-500 uppercase tracking-[0.4em]">Discovered Nodes ({visibleJobs.length})</h3>
             {visibleJobs.length > 0 && (
-              <button onClick={handleSelectAll} className="px-4 py-2 rounded-full text-[7px] font-black uppercase tracking-widest border border-white/10 text-slate-500 hover:text-white transition-all">
-                {allSelected ? 'Clear All' : 'Select All'}
-              </button>
+              <div className="flex gap-2">
+                <button onClick={handleSelectAll} className="px-4 py-2 rounded-full text-[7px] font-black uppercase tracking-widest border border-white/10 text-slate-500 hover:text-white transition-all">
+                  {allSelected ? 'Clear All' : 'Select All'}
+                </button>
+                <button onClick={handleApplyAll} className="px-4 py-2 rounded-full text-[7px] font-black uppercase tracking-widest border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-black transition-all">
+                  Apply All
+                </button>
+              </div>
             )}
           </div>
           {selectedIds.size > 0 && (
