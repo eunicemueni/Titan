@@ -15,6 +15,8 @@ interface ScraperNodeProps {
   bridgeStatus: 'OFFLINE' | 'CONNECTING' | 'ONLINE';
   onReconnect: () => void;
   targetDailyCap: number;
+  initialQuery?: string;
+  onClearInitialQuery?: () => void;
 }
 
 const ScraperNode: React.FC<ScraperNodeProps> = ({ 
@@ -27,13 +29,16 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({
   onBack, 
   bridgeStatus: _bridgeStatus, 
   onReconnect: _onReconnect, 
-  targetDailyCap: _targetDailyCap 
+  targetDailyCap: _targetDailyCap,
+  initialQuery,
+  onClearInitialQuery
 }) => {
   const [isScanning, setIsScanning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSwipe, setShowSwipe] = useState(false);
   
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery || '');
   const [location, setLocation] = useState('Remote Worldwide'); 
 
   const visibleJobs = useMemo(() => jobs.filter(j => j.status === 'discovered'), [jobs]);
@@ -74,13 +79,15 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({
     setSelectedIds(new Set());
   };
 
-  const handleGlobalScrape = async () => {
-    if (!query) return;
+  const handleGlobalScrape = async (overrideQuery?: string) => {
+    const activeQuery = (overrideQuery || query).trim();
+    if (!activeQuery) return;
     setIsScanning(true);
-    onLog(`SCAN: Targeting ${query} nodes (Global Uplink)...`, 'info');
+    setError(null);
+    onLog(`SCAN: Targeting ${activeQuery} nodes (Global Uplink)...`, 'info');
     
     try {
-      const results = await scrapingService.precisionGoogleSearch(query, location);
+      const results = await scrapingService.precisionGoogleSearch(activeQuery, location);
       const mapped: JobRecord[] = results.map((j: any) => ({
         ...j,
         status: 'discovered' as const,
@@ -92,13 +99,24 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({
         onLog(`Captured ${mapped.length} nodes via Global Relay.`, 'success');
       } else {
         onLog(`No nodes identified for "${query}". Try a broader industry term.`, 'warning');
+        setError(`No results found for "${activeQuery}". Try adjusting your search terms.`);
       }
     } catch (err: any) { 
-      onLog("Discovery scan interrupted. Neural link unstable.", "error"); 
+      const msg = "Discovery scan interrupted. Neural link unstable. Please check your connection and try again.";
+      onLog(msg, "error"); 
+      setError(msg);
     } finally { 
       setIsScanning(false); 
     }
   };
+
+  React.useEffect(() => {
+    if (initialQuery) {
+      setQuery(initialQuery);
+      handleGlobalScrape(initialQuery);
+      onClearInitialQuery?.();
+    }
+  }, [initialQuery]);
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
@@ -115,20 +133,36 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({
             BACK
          </button>
          <div className="text-left md:text-right">
-            <h1 className="text-3xl md:text-6xl font-black text-white italic tracking-tighter uppercase leading-none">Neural Scanner</h1>
+            <h1 className="text-3xl md:text-6xl font-black text-white italic tracking-tighter uppercase leading-none">Universal Job Search</h1>
             <p className="text-amber-500 text-[8px] md:text-[10px] font-black uppercase tracking-[0.4em] mt-1 md:mt-2">GROUNDING_ENABLED: BORDERLESS_UHF</p>
          </div>
       </div>
 
-      <div className="bg-slate-950 border border-amber-500/10 rounded-3xl md:rounded-[4rem] p-6 md:p-16 shadow-2xl space-y-6 md:space-y-12">
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10">
-           <input type="text" placeholder="Role (e.g. Actuarial Analyst)..." className="w-full bg-black border border-white/5 rounded-2xl md:rounded-[2.5rem] px-6 py-4 md:px-10 md:py-6 text-white text-sm md:text-xl font-black outline-none focus:border-amber-500 transition-all shadow-inner" value={query} onChange={(e) => setQuery(e.target.value)} />
-           <input type="text" placeholder="Remote Worldwide" className="w-full bg-black border border-white/5 rounded-2xl md:rounded-[2.5rem] px-6 py-4 md:px-10 md:py-6 text-white text-sm md:text-xl font-black outline-none focus:border-amber-500 transition-all shadow-inner" value={location} onChange={(e) => setLocation(e.target.value)} />
+         <div className="bg-slate-950 border border-amber-500/10 rounded-3xl md:rounded-[4rem] p-6 md:p-16 shadow-2xl space-y-6 md:space-y-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10">
+              <input type="text" placeholder="Role (e.g. Actuarial Analyst)..." className="w-full bg-black border border-white/5 rounded-2xl md:rounded-[2.5rem] px-6 py-4 md:px-10 md:py-6 text-white text-sm md:text-xl font-black outline-none focus:border-amber-500 transition-all shadow-inner" value={query} onChange={(e) => setQuery(e.target.value)} />
+              <input type="text" placeholder="Remote Worldwide" className="w-full bg-black border border-white/5 rounded-2xl md:rounded-[2.5rem] px-6 py-4 md:px-10 md:py-6 text-white text-sm md:text-xl font-black outline-none focus:border-amber-500 transition-all shadow-inner" value={location} onChange={(e) => setLocation(e.target.value)} />
+            </div>
+            
+            <div className="flex flex-wrap gap-3 justify-center">
+              {['Data Entry', 'Customer Support', 'Virtual Assistant', 'Project Manager', 'Software Engineer'].map(role => (
+                <button 
+                  key={role}
+                  onClick={() => {
+                    setQuery(role);
+                    handleGlobalScrape(role);
+                  }}
+                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:border-amber-500/50 transition-all"
+                >
+                  {role}
+                </button>
+              ))}
+            </div>
+
+            <button onClick={() => handleGlobalScrape()} disabled={isScanning} className="w-full py-6 md:py-10 bg-white text-black rounded-2xl md:rounded-[2.5rem] font-black uppercase text-[10px] md:text-lg tracking-[0.4em] hover:bg-amber-500 hover:text-white transition-all shadow-2xl active:scale-[0.98]">
+              {isScanning ? 'SYNCING GLOBAL NODES...' : 'Initiate Universal Scan'}
+            </button>
          </div>
-         <button onClick={handleGlobalScrape} disabled={isScanning} className="w-full py-6 md:py-10 bg-white text-black rounded-2xl md:rounded-[2.5rem] font-black uppercase text-[10px] md:text-lg tracking-[0.4em] hover:bg-amber-500 hover:text-white transition-all shadow-2xl active:scale-[0.98]">
-           {isScanning ? 'SYNCING GLOBAL NODES...' : 'Initiate Universal Scan'}
-         </button>
-      </div>
 
       <div className="space-y-6 md:space-y-10">
         <div className="flex justify-between items-center border-b border-white/5 pb-6 md:pb-10">
@@ -194,9 +228,65 @@ const ScraperNode: React.FC<ScraperNodeProps> = ({
             </div>
           ))}
           {visibleJobs.length === 0 && (
-            <div className="col-span-full py-40 text-center border-2 border-dashed border-white/5 rounded-[5rem] opacity-20">
-               <p className="text-3xl font-black uppercase tracking-[0.5em]">SCANNER_IDLE</p>
-               <p className="text-[10px] font-black text-amber-500 uppercase mt-4 tracking-widest">Perform a Universal Scan to populate nodes</p>
+            <div className="col-span-full py-40 text-center border-2 border-dashed border-white/5 rounded-[5rem]">
+               {isScanning ? (
+                 <div className="space-y-8">
+                    <div className="flex justify-center">
+                       <div className="relative w-24 h-24">
+                          <div className="absolute inset-0 border-4 border-amber-500/20 rounded-full"></div>
+                          <div className="absolute inset-0 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                          <div className="absolute inset-4 border-4 border-indigo-500/20 rounded-full"></div>
+                          <div className="absolute inset-4 border-4 border-indigo-500 border-b-transparent rounded-full animate-spin-slow"></div>
+                       </div>
+                    </div>
+                    <div className="animate-pulse">
+                       <p className="text-3xl font-black uppercase tracking-[0.5em] text-white">Neural Scan Active</p>
+                       <p className="text-[10px] font-black text-amber-500 uppercase mt-4 tracking-widest">Synchronizing with global job relays...</p>
+                    </div>
+                 </div>
+               ) : error ? (
+                 <div className="space-y-8 px-6">
+                    <div className="flex justify-center">
+                       <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/20">
+                          <svg className="w-10 h-10 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                       </div>
+                    </div>
+                    <div>
+                       <p className="text-2xl font-black uppercase tracking-[0.3em] text-white">No Nodes Detected</p>
+                       <p className="text-sm font-bold text-slate-400 mt-4 max-w-md mx-auto leading-relaxed">{error}</p>
+                       <div className="flex flex-col md:flex-row gap-4 justify-center mt-8">
+                          <button 
+                            onClick={() => handleGlobalScrape()}
+                            className="px-8 py-3 bg-white text-black rounded-full font-black uppercase text-[10px] tracking-widest hover:bg-amber-500 hover:text-white transition-all"
+                          >
+                            Retry Scan
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const mockJobs: JobRecord[] = [
+                                { id: 'mock-1', role: 'Senior Data Architect', company: 'Neural Systems Inc', location: 'Remote Worldwide', description: 'Simulated Node: Leading development of autonomous data pipelines and neural bridge protocols.', status: 'discovered', timestamp: Date.now(), matchScore: 95 },
+                                { id: 'mock-2', role: 'Risk Management Lead', company: 'Global Finance Corp', location: 'Remote Worldwide', description: 'Simulated Node: Overseeing actuarial risk models and financial audit automation.', status: 'discovered', timestamp: Date.now(), matchScore: 88 },
+                                { id: 'mock-3', role: 'Growth Strategy Consultant', company: 'Nexus Ventures', location: 'Remote Worldwide', description: 'Simulated Node: Driving B2B expansion and market penetration logic for emerging tech.', status: 'discovered', timestamp: Date.now(), matchScore: 92 }
+                              ];
+                              setJobs(prev => [...mockJobs, ...prev]);
+                              setError(null);
+                              onLog("DEMO_MODE: Injected simulated nodes for system verification.", "info");
+                            }}
+                            className="px-8 py-3 bg-slate-900 text-slate-400 border border-white/10 rounded-full font-black uppercase text-[10px] tracking-widest hover:text-white transition-all"
+                          >
+                            Load Demo Nodes
+                          </button>
+                       </div>
+                    </div>
+                 </div>
+               ) : (
+                 <div className="opacity-20">
+                    <p className="text-3xl font-black uppercase tracking-[0.5em]">SCANNER_IDLE</p>
+                    <p className="text-[10px] font-black text-amber-500 uppercase mt-4 tracking-widest">Perform a Universal Scan to populate nodes</p>
+                 </div>
+               )}
             </div>
           )}
         </div>

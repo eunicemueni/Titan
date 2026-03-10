@@ -10,7 +10,7 @@ const MobileNav: React.FC<MobileNavProps> = ({ activeView, onNavigate }) => {
   const items = [
     { id: AppView.DASHBOARD, label: 'CMD', icon: 'M4 6h16M4 12h16M4 18h16' },
     { id: AppView.MISSION_CONTROL, label: 'MISSION', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
-    { id: AppView.JOB_SCANNER, label: 'SCAN', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
+    { id: AppView.JOB_SCANNER, label: 'SEARCH', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
     { id: AppView.INCOME_GIGS, label: 'GIGS', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
     { id: AppView.PROFILE, label: 'VAULT', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' }
   ];

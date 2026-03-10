@@ -4,17 +4,18 @@ import { geminiService } from './geminiService';
 export const scrapingService = {
   /**
    * Dispatches a search query via the TITAN Bridge (Puppeteer) with a silent fallback.
+   * Enhanced with Deep Discovery (Query Expansion) to maximize relevance.
    */
   async precisionGoogleSearch(query: string, location: string) {
-    console.log(`TITAN_OS: Deploying Precision Trace...`);
+    console.log(`TITAN_OS: Deploying Precision Trace for "${query}"...`);
     
-    // Attempt Bridge Relay
+    // 1. PRIMARY TRACE: Attempt Bridge Relay (Puppeteer)
     try {
+      console.log(`TITAN_BRIDGE: Attempting Puppeteer Relay for "${query}"...`);
       const response = await fetch('/api/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: `${query} jobs in ${location}` }),
-        // Increased timeout for Puppeteer
+        body: JSON.stringify({ query: `${query} remote jobs in ${location}` }),
         signal: AbortSignal.timeout(15000) 
       });
 
@@ -22,6 +23,7 @@ export const scrapingService = {
         const data = await response.json();
         const rawResults = data.results?.[0]?.content?.results?.organic || [];
         if (rawResults.length > 0) {
+          console.log(`TITAN_BRIDGE: Puppeteer success. Found ${rawResults.length} results.`);
           return rawResults.map((res: any, i: number) => ({
             id: `pup-${Date.now()}-${i}`,
             company: res.title?.split('at')?.[1]?.trim() || "Target Node",
@@ -33,25 +35,43 @@ export const scrapingService = {
             matchScore: 92,
             timestamp: Date.now()
           }));
+        } else {
+          console.log("TITAN_BRIDGE: Puppeteer returned 0 organic results.");
         }
+      } else {
+        console.warn(`TITAN_BRIDGE: Puppeteer relay returned status ${response.status}`);
       }
     } catch (e: any) {
       console.warn("TITAN_BRIDGE: Puppeteer Relay failed, falling back to Neural Grounding.", e.message);
     }
 
-    // High-Velocity Neural Fallback (Deployment Safe)
+    // 2. NEURAL TRACE: High-Velocity Neural Grounding
     try {
-      const results = await geminiService.performUniversalScrape(query, location);
+      let results = await geminiService.performUniversalScrape(query, location);
+      
+      // 3. DEEP DISCOVERY: If zero results, expand search pattern
       if (results.length === 0) {
-        console.warn("TITAN_DISCOVERY: Neural Scrape returned 0 results. This may be due to safety filters or grounding limits.");
+        console.log(`TITAN_DISCOVERY: Null pulse for "${query}". Initiating Deep Discovery Expansion...`);
+        const variations = await geminiService.expandSearchQuery(query);
+        
+        // Try the first variation (most relevant)
+        if (variations.length > 0 && variations[0] !== query) {
+          console.log(`TITAN_DISCOVERY: Retrying with expanded node: "${variations[0]}"`);
+          results = await geminiService.performUniversalScrape(variations[0], location);
+        }
       }
+
+      if (results.length === 0) {
+        console.warn("TITAN_DISCOVERY: Deep Discovery returned 0 results. This may be due to safety filters or grounding limits.");
+      }
+
       return results.map((j: any, i: number) => ({
         id: `gem-job-${Date.now()}-${i}`,
         company: j.company || "Target Node",
         role: j.role || query,
         location: j.location || location,
         description: j.description || "Operational data synthesized via AI Grounding.",
-        sourceUrl: j.sourceUrl || "", // Empty URL signals "Shadow Market"
+        sourceUrl: j.sourceUrl || "", 
         status: 'discovered',
         matchScore: 95,
         timestamp: Date.now(),

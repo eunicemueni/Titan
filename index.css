@@ -41,6 +41,15 @@
 
 .boot-pulse { animation: pulse 2.5s infinite ease-in-out; }
 
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
 .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }

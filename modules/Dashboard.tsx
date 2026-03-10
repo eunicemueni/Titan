@@ -79,7 +79,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [targetDailyCap]);
 
   const coreModules = [
-    { id: AppView.JOB_SCANNER, name: 'Neural Scanner', desc: 'Public Discovery Uplinks', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z', color: 'border-slate-800 hover:border-indigo-500/50 hover:bg-indigo-500/5' },
+    { id: AppView.JOB_SCANNER, name: 'Job Search / Scanner', desc: 'Public Discovery Uplinks', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z', color: 'border-slate-800 hover:border-indigo-500/50 hover:bg-indigo-500/5' },
     { id: AppView.OUTREACH, name: 'Hidden Hunter', desc: 'Shadow Market Targets', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', color: 'border-slate-800 hover:border-cyan-500/50 hover:bg-cyan-500/5' },
     { id: AppView.MISSION_CONTROL, name: 'Mission Deck', desc: 'Active Queue Hub', icon: 'M13 10V3L4 14h7v7l9-11h-7z', color: 'border-slate-800 hover:border-amber-500/50 hover:bg-amber-500/5' },
     { id: AppView.INCOME_B2B, name: 'Revenue Hub', desc: 'B2B Deficit Audit', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2', color: 'border-slate-800 hover:border-purple-500/50 hover:bg-purple-500/5' },

@@ -17,7 +17,6 @@ import ClientNexus from './modules/ClientNexus';
 import Sidebar from './modules/Sidebar';
 import Header from './components/Header';
 import Console from './components/Console';
-import NeuralLink from './components/NeuralLink';
 import MobileNav from './MobileNav';
 import GlobalSearchModal from './components/GlobalSearchModal';
 import { INITIAL_TELEMETRY } from './constants';
@@ -77,13 +76,36 @@ const App: React.FC = () => {
   const [isAutopilotActive, setIsAutopilotActive] = useState(false);
   const [targetDailyCap, setTargetDailyCap] = useState(2000);
   const [logs, setLogs] = useState<TelemetryLog[]>(INITIAL_TELEMETRY);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [scannerInitialQuery, setScannerInitialQuery] = useState('');
   const [bridgeStatus, setBridgeStatus] = useState<'OFFLINE' | 'ONLINE'>('OFFLINE');
   const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
   const [isMarketAutoScout, setIsMarketAutoScout] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    const saved = localStorage.getItem('titan_recent_searches');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const addRecentSearch = useCallback((q: string) => {
+    if (!q.trim()) return;
+    setRecentSearches(prev => {
+      const filtered = prev.filter(s => s.toLowerCase() !== q.toLowerCase());
+      const next = [q, ...filtered].slice(0, 10);
+      localStorage.setItem('titan_recent_searches', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  // Debounce Search Query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const addLog = useCallback((message: string, level: TelemetryLog['level'] = 'info') => {
     const newLog: TelemetryLog = { id: `log-${Date.now()}`, message, level, timestamp: Date.now() };
@@ -220,7 +242,10 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [isAutopilotActive, jobs, currentProfile, addLog, handleSentRecord, updateStats]);
 
-  const handleNavigate = (view: AppView) => {
+  const handleNavigate = (view: AppView, initialQuery?: string) => {
+    if (view === AppView.JOB_SCANNER && initialQuery) {
+      setScannerInitialQuery(initialQuery);
+    }
     setCurrentView(view);
     window.scrollTo(0, 0);
   };
@@ -237,7 +262,7 @@ const App: React.FC = () => {
       case AppView.MISSION_CONTROL:
         return <MissionControl {...basicProps} jobs={jobs} setJobs={setJobs} isAutopilot={isAutopilotActive} onToggleAutopilot={() => setIsAutopilotActive(!isAutopilotActive)} sentRecords={sentRecords} queueStatus={{waiting: jobs.filter(j => j.status === 'queued').length, active: isAutopilotActive ? 1 : 0, completed: sentRecords.length, failed: 0}} targetDailyCap={targetDailyCap} evasionStatus="STEALTH_v7" missions={[]} />;
       case AppView.JOB_SCANNER:
-        return <ScraperNode {...basicProps} setJobs={setJobs} jobs={jobs} updateStats={updateStats} onReconnect={() => {}} targetDailyCap={targetDailyCap} />;
+        return <ScraperNode {...basicProps} setJobs={setJobs} jobs={jobs} updateStats={updateStats} onReconnect={() => {}} targetDailyCap={targetDailyCap} initialQuery={scannerInitialQuery} onClearInitialQuery={() => setScannerInitialQuery('')} />;
       case AppView.OUTREACH:
         return <HiddenHunter {...basicProps} updateStats={updateStats} companies={[]} setCompanies={() => {}} evasionStatus="STEALTH" targetDailyCap={targetDailyCap} />;
       case AppView.INCOME_GIGS:
@@ -261,13 +286,43 @@ const App: React.FC = () => {
     <div className="flex h-screen w-screen bg-titan-bg font-sans text-slate-200 overflow-hidden relative">
       <Sidebar activeView={currentView} onNavigate={handleNavigate} bridgeStatus={bridgeStatus} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        <Header activeView={currentView} activePersona={currentProfile.fullName} personaDomain={currentProfile.domain} personaTheme={currentProfile.themeColor} voiceEnabled={voiceEnabled} onToggleVoice={() => setVoiceEnabled(!voiceEnabled)} onSearch={(q) => { setSearchQuery(q); setSearchOpen(true); }} onOpenConsole={() => setConsoleOpen(true)} />
+        <Header 
+          activeView={currentView} 
+          activePersona={currentProfile.fullName} 
+          personaDomain={currentProfile.domain} 
+          personaTheme={currentProfile.themeColor} 
+          onSearch={(q) => { 
+            if (q.trim()) {
+              addRecentSearch(q);
+              handleNavigate(AppView.JOB_SCANNER, q);
+              setSearchOpen(false);
+            } else {
+              setSearchOpen(true);
+            }
+          }} 
+          onSearchChange={(q) => { 
+            setSearchQuery(q); 
+          }}
+          searchValue={searchQuery}
+          onOpenConsole={() => setConsoleOpen(true)} 
+        />
         <main className="flex-1 overflow-y-auto custom-scrollbar relative">{renderView()}</main>
         <MobileNav activeView={currentView} onNavigate={handleNavigate} />
       </div>
       <Console isOpen={consoleOpen} onClose={() => setConsoleOpen(false)} profile={currentProfile} onLog={addLog} autopilot={isAutopilotActive} setAutopilot={setIsAutopilotActive} dailyCap={targetDailyCap} setDailyCap={setTargetDailyCap} setView={setCurrentView} evasionStatus="STEALTH" />
-      <NeuralLink isActive={voiceEnabled} onClose={() => setVoiceEnabled(false)} />
-      <GlobalSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} query={searchQuery} jobs={jobs} sentRecords={sentRecords} profiles={profiles} onNavigate={handleNavigate} />
+      <GlobalSearchModal 
+        isOpen={searchOpen} 
+        onClose={() => setSearchOpen(false)} 
+        query={searchQuery} 
+        setQuery={setSearchQuery}
+        debouncedQuery={debouncedSearchQuery}
+        recentSearches={recentSearches}
+        onAddRecentSearch={addRecentSearch}
+        jobs={jobs} 
+        sentRecords={sentRecords} 
+        profiles={profiles} 
+        onNavigate={handleNavigate} 
+      />
     </div>
   );
 };

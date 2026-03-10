@@ -17,7 +17,7 @@ async function startServer() {
   app.use(express.json());
 
   const PORT = 3000;
-  const REDIS_URL = process.env.REDIS_URL || 'rediss://default:WR4PsdBO788Qyav9olhP50pmO9rLt80e@redis-13106.c17.us-east-1-4.ec2.cloud.redislabs.com:13106';
+  const REDIS_URL = process.env.REDIS_URL;
   const OXYLABS_USER = process.env.OXYLABS_USER || 'Eunnah100_QJl9q';
   const OXYLABS_PASS = process.env.OXYLABS_PASS || 'cV4sOJ=BSGFe1im';
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.API_KEY || 'AIzaSyCxmktI5Kgb2nHfVHxs9UtSR9JCz5cTh0k';
@@ -33,12 +33,13 @@ async function startServer() {
   // TITAN AUTONOMOUS CORE INITIALIZATION
   if (REDIS_URL) {
     try {
-      console.log(`TITAN_OS: Attempting Redis connection at ${REDIS_URL}...`);
+      console.log(`TITAN_OS: Attempting Redis connection...`);
       redisConnection = new IORedis(REDIS_URL, { 
         maxRetriesPerRequest: null,
-        connectTimeout: 10000,
+        connectTimeout: 5000,
+        lazyConnect: true, // Don't connect immediately to avoid startup crashes
         retryStrategy: (times) => {
-          if (times > 2) {
+          if (times > 3) {
             console.warn('TITAN_REDIS: Max connection attempts reached. Automation core offline.');
             return null; 
           }
@@ -55,6 +56,11 @@ async function startServer() {
       redisConnection.on('connect', () => {
         console.log('TITAN_REDIS_ONLINE: Automation core synchronized.');
         (redisConnection as any)._loggedError = false;
+      });
+
+      // Explicitly trigger connection
+      redisConnection.connect().catch(err => {
+        console.warn('TITAN_REDIS_CONNECT_FAIL: Initial connection failed.', err.message);
       });
 
       relayQueue = new Queue('RelayQueue', { connection: redisConnection });

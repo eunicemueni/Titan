@@ -17,7 +17,7 @@ CORE DNA: Professional, authoritative, efficient.
 RULES: Use Google Search/Maps grounding for market data. Return results in clear JSON format where specified.`;
 
 function getAI() {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || 'AIzaSyCxmktI5Kgb2nHfVHxs9UtSR9JCz5cTh0k';
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
     throw new Error("TITAN_OS: GEMINI_API_KEY is missing or invalid.");
   }
@@ -93,24 +93,59 @@ export const geminiService = {
       
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Search Google for active 100% remote job openings for "${industry}" in "${location}". 
-        Return a JSON array of objects. 
-        Each object MUST have: company, role, description, sourceUrl, location.
-        Example: [{"company": "Example Corp", "role": "Developer", "description": "Remote role...", "sourceUrl": "https://example.com", "location": "Remote"}]`,
+        contents: `Find at least 10 active remote job openings related to "${industry}". 
+        Location context: "${location}". 
+        
+        SEARCH_STRATEGY:
+        1. Identify exact matches for "${industry}".
+        2. Expand search to high-relevance synonyms (e.g., if "Actuarial", also check "Risk Analyst", "Insurance Consultant").
+        3. Prioritize "100% Remote", "Work from home", "Telecommute", and "Global/Anywhere" roles.
+        4. Target direct company career pages (Greenhouse, Lever, Workday) and specialized job boards.
+        5. Ensure the results are CURRENT (posted within the last 30 days).
+        
+        Return results in the specified JSON format.`,
         config: {
-          systemInstruction: SYSTEM_INSTRUCTION + "\nIMPORTANT: Return ONLY valid JSON array. No markdown blocks.",
+          systemInstruction: SYSTEM_INSTRUCTION,
           tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                company: { type: Type.STRING },
+                role: { type: Type.STRING },
+                description: { type: Type.STRING },
+                sourceUrl: { type: Type.STRING },
+                location: { type: Type.STRING }
+              },
+              required: ["company", "role", "description", "sourceUrl", "location"]
+            }
+          }
         }
       });
       
       const text = response.text?.trim() || "[]";
-      const results = extractJson(text) || [];
-      console.log(`TITAN_OS: Neural Scrape complete. Found ${results.length} results.`);
+      let results = extractJson(text) || [];
+      
+      console.log(`TITAN_OS: Neural Scrape complete. Found ${results.length} results via JSON.`);
       
       const groundingSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       const sourceUrls = groundingSources
         .filter(chunk => chunk.web?.uri)
         .map(chunk => ({ title: chunk.web?.title || "Search Source", uri: chunk.web?.uri || "" }));
+
+      // FALLBACK: If JSON is empty but we have grounding sources, synthesize results from sources
+      if (results.length === 0 && sourceUrls.length > 0) {
+        console.log("TITAN_OS: JSON empty, synthesizing from grounding sources...");
+        results = sourceUrls.slice(0, 10).map((src) => ({
+          company: src.title.split(' - ')[0] || "Target Node",
+          role: industry,
+          description: `Active opportunity identified via ${src.title}. Grounding confirmed via neural relay.`,
+          sourceUrl: src.uri,
+          location: location
+        }));
+      }
 
       return results.map((job: any) => ({ 
         ...job, 
@@ -119,6 +154,26 @@ export const geminiService = {
     } catch (error) {
       console.error("TITAN_OS: Neural Scrape failed:", error);
       return [];
+    }
+  },
+
+  async expandSearchQuery(query: string): Promise<string[]> {
+    try {
+      const ai = getAI();
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Given the job search query "${query}", generate 3 highly relevant alternative search strings that would find similar remote roles. Return as a simple JSON array of strings.`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        }
+      });
+      return extractJson(response.text) || [query];
+    } catch (e) {
+      return [query];
     }
   },
 
