@@ -12,11 +12,16 @@ export const scrapingService = {
     // 1. PRIMARY TRACE: Attempt Bridge Relay (Puppeteer)
     try {
       console.log(`TITAN_BRIDGE: Attempting Puppeteer Relay for "${query}"...`);
+      
+      const searchStr = location.toLowerCase().includes('worldwide') 
+        ? `${query} remote jobs` 
+        : `${query} remote jobs in ${location}`;
+
       const response = await fetch('/api/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: `${query} remote jobs in ${location}` }),
-        signal: AbortSignal.timeout(15000) 
+        body: JSON.stringify({ query: searchStr }),
+        signal: AbortSignal.timeout(90000) // Increased to 90s for Puppeteer
       });
 
       if (response.ok) {
@@ -47,22 +52,10 @@ export const scrapingService = {
 
     // 2. NEURAL TRACE: High-Velocity Neural Grounding
     try {
-      let results = await geminiService.performUniversalScrape(query, location);
+      const results = await geminiService.performUniversalScrape(query, location);
       
-      // 3. DEEP DISCOVERY: If zero results, expand search pattern
       if (results.length === 0) {
-        console.log(`TITAN_DISCOVERY: Null pulse for "${query}". Initiating Deep Discovery Expansion...`);
-        const variations = await geminiService.expandSearchQuery(query);
-        
-        // Try the first variation (most relevant)
-        if (variations.length > 0 && variations[0] !== query) {
-          console.log(`TITAN_DISCOVERY: Retrying with expanded node: "${variations[0]}"`);
-          results = await geminiService.performUniversalScrape(variations[0], location);
-        }
-      }
-
-      if (results.length === 0) {
-        console.warn("TITAN_DISCOVERY: Deep Discovery returned 0 results. This may be due to safety filters or grounding limits.");
+        console.warn(`TITAN_DISCOVERY: Null pulse for "${query}".`);
       }
 
       return results.map((j: any, i: number) => ({

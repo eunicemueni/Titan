@@ -3,7 +3,7 @@
 // PLATFORM_SYNC_TOKEN: 2026-03-07-T14-12
 // NEURAL_PULSE: ACTIVE
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord } from './types';
+import { AppView, UserProfile, JobRecord, TelemetryLog, SentRecord, TargetedCompany } from './types';
 import Dashboard from './modules/Dashboard';
 import MissionControl from './modules/MissionControl';
 import ScraperNode from './modules/JobAutopilot';
@@ -69,6 +69,8 @@ ayanainniss100@gmail.com | LinkedIn: linkedin.com/in/ayana-inniss-5b01332b0`,
 
 const App: React.FC = () => {
   const [jobs, setJobs] = useState<JobRecord[]>([]);
+  const [companies, setCompanies] = useState<TargetedCompany[]>([]);
+  const [autoGigs, setAutoGigs] = useState<any[]>([]);
   const [sentRecords, setSentRecords] = useState<SentRecord[]>([]);
   const [profiles, setProfiles] = useState<UserProfile[]>(HARDCODED_PROFILES);
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
@@ -83,6 +85,22 @@ const App: React.FC = () => {
   const [scannerInitialQuery, setScannerInitialQuery] = useState('');
   const [bridgeStatus, setBridgeStatus] = useState<'OFFLINE' | 'ONLINE'>('OFFLINE');
   const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
+
+  // Bridge Health Monitor
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) setBridgeStatus('ONLINE');
+        else setBridgeStatus('OFFLINE');
+      } catch {
+        setBridgeStatus('OFFLINE');
+      }
+    };
+    checkHealth();
+    const interval = setInterval(checkHealth, 30000);
+    return () => clearInterval(interval);
+  }, []);
   const [isMarketAutoScout, setIsMarketAutoScout] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
     const saved = localStorage.getItem('titan_recent_searches');
@@ -226,7 +244,8 @@ const App: React.FC = () => {
             type: 'JOB_APPLICATION',
             recipient: queuedJob.company,
             subject: pkg.subject,
-            industry: 'GENERAL'
+            industry: 'GENERAL',
+            payload: JSON.stringify(pkg)
           });
           updateStats({ coldEmailsSent: (currentProfile.stats.coldEmailsSent || 0) + 1 });
         } else {
@@ -264,9 +283,9 @@ const App: React.FC = () => {
       case AppView.JOB_SCANNER:
         return <ScraperNode {...basicProps} setJobs={setJobs} jobs={jobs} updateStats={updateStats} onReconnect={() => {}} targetDailyCap={targetDailyCap} initialQuery={scannerInitialQuery} onClearInitialQuery={() => setScannerInitialQuery('')} />;
       case AppView.OUTREACH:
-        return <HiddenHunter {...basicProps} updateStats={updateStats} companies={[]} setCompanies={() => {}} evasionStatus="STEALTH" targetDailyCap={targetDailyCap} />;
+        return <HiddenHunter {...basicProps} updateStats={updateStats} companies={companies} setCompanies={setCompanies} evasionStatus="STEALTH" targetDailyCap={targetDailyCap} />;
       case AppView.INCOME_GIGS:
-        return <GigFlash {...basicProps} autoGigs={[]} setAutoGigs={() => {}} isAutopilot={isAutopilotActive} />;
+        return <GigFlash {...basicProps} autoGigs={autoGigs} setAutoGigs={setAutoGigs} isAutopilot={isAutopilotActive} />;
       case AppView.INCOME_B2B:
         return <RevenueHubs {...basicProps} updateStats={updateStats} />;
       case AppView.MARKET_NEXUS:

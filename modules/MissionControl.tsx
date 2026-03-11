@@ -35,6 +35,7 @@ const MissionControl: React.FC<MissionControlProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'WAR_ROOM' | 'AUDIT_LOG'>('WAR_ROOM');
   const [liveMissions, setLiveMissions] = useState<Mission[]>(missions || []);
+  const [viewingRecord, setViewingRecord] = useState<SentRecord | null>(null);
   const tickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -199,7 +200,17 @@ const MissionControl: React.FC<MissionControlProps> = ({
                               <p className="text-[8px] font-bold text-slate-700 uppercase mt-1.5 truncate max-w-[300px]">{record.subject}</p>
                            </td>
                            <td className="py-8 text-right">
-                              <span className="px-4 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full text-[8px] font-black uppercase italic">Node_Captured</span>
+                              <div className="flex items-center justify-end gap-4">
+                                {record.payload && (
+                                  <button 
+                                    onClick={() => setViewingRecord(record)}
+                                    className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:text-white transition-colors"
+                                  >
+                                    View Assets
+                                  </button>
+                                )}
+                                <span className="px-4 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full text-[8px] font-black uppercase italic">Node_Captured</span>
+                              </div>
                            </td>
                         </tr>
                       ))}
@@ -255,6 +266,59 @@ const MissionControl: React.FC<MissionControlProps> = ({
            </div>
         </div>
       </div>
+      {viewingRecord && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-10 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
+          <div className="w-full max-w-6xl h-full max-h-[90vh] bg-slate-950 border border-white/10 rounded-[3rem] flex flex-col overflow-hidden shadow-2xl">
+            <div className="p-8 border-b border-white/5 flex justify-between items-center shrink-0">
+               <div>
+                  <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">Mission Asset Audit</h3>
+                  <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-1">Target: {viewingRecord.recipient} | Type: {viewingRecord.type}</p>
+               </div>
+               <button onClick={() => setViewingRecord(null)} className="p-4 text-slate-500 hover:text-white transition-all">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12"/></svg>
+               </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-8 md:p-12 custom-scrollbar">
+               {(() => {
+                 try {
+                   const data = JSON.parse(viewingRecord.payload || '{}');
+                   return (
+                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                        <div className="space-y-8">
+                           <div className="space-y-4">
+                              <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Tailored Cover Letter</label>
+                              <div className="bg-white p-10 rounded-[2rem] text-[12px] font-serif text-slate-800 leading-relaxed whitespace-pre-wrap shadow-inner min-h-[400px]">
+                                 {data.coverLetter || data.emailBody || 'No cover letter data available.'}
+                              </div>
+                           </div>
+                        </div>
+                        <div className="space-y-8">
+                           <div className="space-y-4">
+                              <label className="text-[10px] font-black text-cyan-500 uppercase tracking-widest">Neural CV Overlay</label>
+                              <div className="bg-slate-900 p-10 rounded-[2rem] text-[10px] font-mono text-slate-400 leading-relaxed whitespace-pre-wrap border border-white/5 shadow-inner min-h-[400px]">
+                                 {data.cv || 'No CV data available.'}
+                              </div>
+                           </div>
+                        </div>
+                        {data.executiveSummary && (
+                          <div className="lg:col-span-2 space-y-4">
+                             <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Executive Summary</label>
+                             <div className="bg-slate-900/50 p-10 rounded-[2rem] text-[13px] font-serif italic text-slate-300 leading-relaxed border border-white/5">
+                                {data.executiveSummary}
+                             </div>
+                          </div>
+                        )}
+                     </div>
+                   );
+                 } catch (e) {
+                   return <div className="text-red-500 font-mono text-xs">Error parsing mission assets.</div>;
+                 }
+               })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

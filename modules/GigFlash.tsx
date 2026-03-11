@@ -132,11 +132,11 @@ const GigFlash: React.FC<GigFlashProps> = ({ profile, onLog, onSent, onBack, aut
 
       <div className="bg-titan-surface border border-slate-900 rounded-[4rem] p-16 shadow-2xl relative overflow-hidden group text-center">
          <div className="max-w-4xl mx-auto relative z-10 space-y-8">
-           <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">Gig Pulse Discovery</h3>
+           <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">Global Remote Pulse</h3>
            <p className="text-sm text-slate-400 font-medium leading-relaxed max-w-2xl mx-auto">
              {isAutopilot 
-               ? "TITAN is currently pulsing global freelance hubs in the background. Fresh gigs will appear below automatically." 
-               : "Scrape global freelance hubs for all projects matching your expertise."}
+               ? "TITAN is currently pulsing global hubs for remote tasks (Data Entry, Writing, Tech) posted within the last 5 hours." 
+               : "Scrape global freelance hubs for all remote tasks—from Data Entry and Writing to Tech—posted in the last 5 hours."}
            </p>
            
            {!isAutopilot && (
@@ -145,7 +145,7 @@ const GigFlash: React.FC<GigFlashProps> = ({ profile, onLog, onSent, onBack, aut
                disabled={loading}
                className="w-full py-8 bg-amber-500 text-black rounded-[2.5rem] font-black uppercase text-sm tracking-[0.4em] hover:bg-white transition-all shadow-2xl"
              >
-               {loading ? 'SYNCHRONIZING...' : 'Trigger Manual Pulse'}
+               {loading ? 'SYNCHRONIZING FRESH GIGS...' : 'Trigger 5H Global Pulse'}
              </button>
            )}
          </div>
@@ -174,6 +174,12 @@ const GigFlash: React.FC<GigFlashProps> = ({ profile, onLog, onSent, onBack, aut
              </div>
           </div>
         ))}
+        {(!autoGigs || autoGigs.length === 0) && !loading && (
+          <div className="col-span-full py-20 text-center space-y-4">
+            <div className="text-4xl opacity-20">📡</div>
+            <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em]">No active freelance nodes detected in current pulse.</p>
+          </div>
+        )}
       </div>
     </div>
   );

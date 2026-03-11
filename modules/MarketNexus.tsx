@@ -142,7 +142,12 @@ const MarketNexus: React.FC<{
     });
 
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'SENT', isSold: true, tailoredPackage: pitch } : l));
-    onSent({ type: 'SERVICE_OFFER', recipient: lead.email, subject });
+    onSent({ 
+      type: 'SERVICE_OFFER', 
+      recipient: lead.email, 
+      subject,
+      payload: JSON.stringify(pitch)
+    });
     onLog(`PROPOSAL TRANSMITTED: Digital Twin proposal sent to ${lead.name}.`, "success");
     setPreviewingPitch(null);
   };

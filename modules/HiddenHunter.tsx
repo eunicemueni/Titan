@@ -16,7 +16,7 @@ interface HiddenHunterProps {
   evasionStatus: string;
 }
 
-const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats: _updateStats, onSent, companies, setCompanies, onBack, targetDailyCap: _targetDailyCap, evasionStatus }) => {
+const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats: _updateStats, onSent, companies, setCompanies, onBack, targetDailyCap, evasionStatus }) => {
   const [loading, setLoading] = useState(false);
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [industry, setIndustry] = useState('');
@@ -24,6 +24,45 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
   const [region, setRegion] = useState('Remote Worldwide'); // Shifted to global default
   const [viewingPackage, setViewingPackage] = useState<TargetedCompany | null>(null);
   const [physicalNodes, setPhysicalNodes] = useState<any[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === companies.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(companies.map(c => c.id)));
+    }
+  };
+
+  const handleBulkDispatch = async () => {
+    const toDispatch = companies.filter(c => selectedIds.has(c.id) && c.status !== 'SENT');
+    if (toDispatch.length === 0) return;
+
+    setIsBulkProcessing(true);
+    onLog(`BULK_RELAY: Initiating parallel transmission for ${toDispatch.length} nodes...`, 'info');
+
+    for (const company of toDispatch) {
+      try {
+        await handleDispatch(company);
+      } catch (err) {
+        onLog(`RELAY_FAIL: Node ${company.name} transmission interrupted.`, 'error');
+      }
+    }
+
+    setIsBulkProcessing(false);
+    setSelectedIds(new Set());
+    onLog(`BULK_COMPLETE: All selected nodes processed.`, 'success');
+  };
 
   const handleScoutDeployment = async () => {
     if (!industry || loading) return;
@@ -84,7 +123,12 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
       const updated = { ...company, tailoredPackage: pkg, status: 'SENT' };
       setCompanies(prev => prev.map(c => c.id === company.id ? updated : c));
       setViewingPackage(updated);
-      onSent({ type: 'COL_OUTREACH', recipient: company.name, subject });
+      onSent({ 
+        type: 'COL_OUTREACH', 
+        recipient: company.name, 
+        subject,
+        payload: JSON.stringify(pkg)
+      });
       onLog(`RELAY_COMPLETE: Transmitted via identity proxy.`, 'success');
     } catch (err) {
       onLog("Identity synthesis failed.", 'error');
@@ -161,7 +205,7 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
               Hidden Hunter
             </h1>
             <p className="text-cyan-500 text-[9px] font-black uppercase mt-3 tracking-widest">
-              EVASION: {evasionStatus} | GEOGRAPHY: BORDERLESS
+              EVASION: {evasionStatus} | GEOGRAPHY: BORDERLESS | IDENTITY: {profile.email} | CAP: {targetDailyCap}/DAY
             </p>
          </div>
       </div>
@@ -175,6 +219,42 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
         <button onClick={handleScoutDeployment} disabled={loading || !industry} className="w-full bg-white text-black py-8 rounded-[2.5rem] font-black uppercase text-sm tracking-[0.4em] hover:bg-cyan-600 hover:text-white transition-all shadow-2xl active:scale-95">
           {loading ? 'Performing Global UHF Trace...' : `Deploy High-Velocity Corporate Scan`}
         </button>
+
+        {companies.length > 0 && (
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-6 border-t border-white/5">
+            <div className="flex items-center gap-6">
+              <button 
+                onClick={toggleSelectAll}
+                className="flex items-center gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-white transition-all"
+              >
+                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${selectedIds.size === companies.length ? 'bg-cyan-500 border-cyan-500' : 'border-slate-700 bg-black'}`}>
+                  {selectedIds.size === companies.length && <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path d="M5 13l4 4L19 7" /></svg>}
+                </div>
+                {selectedIds.size === companies.length ? 'Deselect All' : 'Select All Nodes'}
+              </button>
+              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                {selectedIds.size} Nodes Selected
+              </span>
+            </div>
+            
+            {selectedIds.size > 0 && (
+              <button 
+                onClick={handleBulkDispatch}
+                disabled={isBulkProcessing}
+                className="bg-cyan-600 text-white px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all shadow-xl disabled:opacity-50 flex items-center gap-3"
+              >
+                {isBulkProcessing ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Processing Bulk Relay...
+                  </>
+                ) : (
+                  `Dispatch ${selectedIds.size} Selected Relays`
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {physicalNodes.length > 0 && (
@@ -201,7 +281,17 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
         {companies.map((company) => (
-          <div key={company.id} className={`p-10 rounded-[4rem] border transition-all flex flex-col justify-between relative group ${company.status === 'SENT' ? 'border-emerald-500 bg-emerald-950/5' : 'border-slate-800 bg-titan-surface hover:border-slate-600'}`}>
+          <div 
+            key={company.id} 
+            onClick={() => toggleSelect(company.id)}
+            className={`p-10 rounded-[4rem] border transition-all flex flex-col justify-between relative group cursor-pointer ${selectedIds.has(company.id) ? 'border-cyan-500 bg-cyan-500/5 ring-1 ring-cyan-500/50' : company.status === 'SENT' ? 'border-emerald-500 bg-emerald-950/5' : 'border-slate-800 bg-titan-surface hover:border-slate-600'}`}
+          >
+            <div className="absolute top-8 right-8 z-10">
+              <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${selectedIds.has(company.id) ? 'bg-cyan-500 border-cyan-500' : 'border-slate-700 bg-black/50 group-hover:border-slate-500'}`}>
+                {selectedIds.has(company.id) && <svg className="w-3.5 h-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path d="M5 13l4 4L19 7" /></svg>}
+              </div>
+            </div>
+            
             {enrichingId === company.id && (
                <div className="absolute inset-0 bg-cyan-600/20 backdrop-blur-md z-20 rounded-[4rem] flex flex-col items-center justify-center p-10 text-center">
                   <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -223,7 +313,7 @@ const HiddenHunter: React.FC<HiddenHunterProps> = ({ profile, onLog, updateStats
                 </div>
               </div>
             </div>
-            <div className="mt-8">
+            <div className="mt-8" onClick={(e) => e.stopPropagation()}>
               {company.email === 'Node Locked' ? (
                 <button onClick={() => handleDeepEnrich(company)} className="w-full py-5 bg-slate-900 text-slate-400 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-slate-800 hover:text-white transition-all">Enrich Lead Node</button>
               ) : company.status === 'SENT' ? (

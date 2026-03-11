@@ -34,16 +34,17 @@ async function startServer() {
   if (REDIS_URL) {
     try {
       console.log(`TITAN_OS: Attempting Redis connection...`);
-      redisConnection = new IORedis(REDIS_URL, { 
+      // Ensure protocol is present
+      const formattedUrl = REDIS_URL.startsWith('redis') ? REDIS_URL : `redis://${REDIS_URL.startsWith('//') ? REDIS_URL.slice(2) : REDIS_URL}`;
+      
+      redisConnection = new IORedis(formattedUrl, { 
         maxRetriesPerRequest: null,
-        connectTimeout: 5000,
-        lazyConnect: true, // Don't connect immediately to avoid startup crashes
+        connectTimeout: 10000,
+        lazyConnect: true,
         retryStrategy: (times) => {
-          if (times > 3) {
-            console.warn('TITAN_REDIS: Max connection attempts reached. Automation core offline.');
-            return null; 
-          }
-          return Math.min(times * 500, 2000);
+          const delay = Math.min(times * 1000, 5000);
+          console.log(`TITAN_REDIS: Reconnecting in ${delay}ms... (Attempt ${times})`);
+          return delay;
         }
       });
 
@@ -128,7 +129,7 @@ async function startServer() {
             domain: 'com',
             query: query,
             pages: 1,
-            limit: 10,
+            limit: 50,
           }),
         });
 
@@ -146,34 +147,103 @@ async function startServer() {
     }
 
     // 2. Fallback to Puppeteer (Local/Docker)
+    let browser: any;
     try {
       console.log('TITAN_BRIDGE: Deploying Puppeteer Local Scraper...');
-      const browser = await puppeteer.launch({
+      browser = await puppeteer.launch({
         executablePath: PUPPETEER_PATH,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox', 
+          '--disable-dev-shm-usage',
+          '--disable-blink-features=AutomationControlled'
+        ]
       });
       const page = await browser.newPage();
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      page.on('console', (msg: any) => console.log('TITAN_BRIDGE_PAGE:', msg.text()));
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
       
-      await page.goto(`https://www.google.com/search?q=${encodeURIComponent(query)}`, { waitUntil: 'networkidle2' });
+      // Set extra headers to look more human
+      await page.setExtraHTTPHeaders({
+        'Accept-Language': 'en-US,en;q=0.9',
+      });
+
+      await page.goto(`https://www.google.com/search?q=${encodeURIComponent(query)}&num=100`, { 
+        waitUntil: 'networkidle2',
+        timeout: 60000 
+      });
+
+      // Handle common cookie consent buttons
+      try {
+        const consentButtons = await page.$$('button');
+        for (const btn of consentButtons) {
+          const text = await page.evaluate((el: any) => el.innerText, btn);
+          if (text.includes('Accept all') || text.includes('I agree') || text.includes('Accept everything')) {
+            await btn.click();
+            await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 5000 }).catch(() => {});
+            break;
+          }
+        }
+      } catch (e) {
+        console.log("TITAN_BRIDGE: No consent modal detected or failed to click.");
+      }
+
+      // Small random delay to seem more human
+      await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
       
       const results = await page.evaluate(() => {
-        return Array.from(document.querySelectorAll('.g')).slice(0, 10).map(el => ({
-          title: (el.querySelector('h3') as HTMLElement)?.innerText,
-          url: (el.querySelector('a') as HTMLAnchorElement)?.href,
-          snippet: (el.querySelector('.VwiC3b') as HTMLElement)?.innerText
-        })).filter(r => r.title && r.url);
+        // Broaden selectors to catch more variations of Google's layout
+        const selectors = ['.g', 'div[data-hveid]', '.tF2Cxc', '.srK7ed', '.Uo806e', '.MjjY9e', '.j7999d'];
+        let items: Element[] = [];
+        selectors.forEach(s => {
+          items = [...items, ...Array.from(document.querySelectorAll(s))];
+        });
+
+        // Check for "No results found" text
+        const noResultsText = document.body.innerText.includes('did not match any documents') || 
+                            document.body.innerText.includes('No results found for');
+        
+        if (items.length === 0 && noResultsText) {
+          return []; // Explicitly no results
+        }
+
+        // Unique items by their text content to avoid duplicates from overlapping selectors
+        const seen = new Set();
+        const uniqueItems = items.filter(el => {
+          const txt = el.textContent?.trim();
+          if (!txt || seen.has(txt)) return false;
+          seen.add(txt);
+          return true;
+        });
+
+        const results = uniqueItems.slice(0, 80).map(el => {
+          const titleEl = el.querySelector('h3');
+          const linkEl = el.querySelector('a');
+          const snippetEl = el.querySelector('.VwiC3b, .MU3Yyc, .s3uSbe, .yD979d, .itY46b, .lyL65e');
+          
+          return {
+            title: (titleEl as HTMLElement)?.innerText || "",
+            url: (linkEl as HTMLAnchorElement)?.href || "",
+            snippet: (snippetEl as HTMLElement)?.innerText || ""
+          };
+        }).filter(r => r.title && r.url && r.url.startsWith('http') && !r.url.includes('google.com/search'));
+
+        console.log(`TITAN_BRIDGE_INTERNAL: Found ${items.length} raw items, ${uniqueItems.length} unique, ${results.length} filtered.`);
+        return results;
       });
 
       await browser.close();
       
       if (results.length > 0) {
+        console.log(`TITAN_BRIDGE: Puppeteer success. Found ${results.length} results.`);
         return res.json({ results: [{ content: { results: { organic: results } } }] });
       }
-      throw new Error('No results found via Puppeteer');
+      return res.status(404).json({ error: 'No results found via Puppeteer' });
     } catch (e: any) {
       console.error('TITAN_BRIDGE: Scraper failure.', e.message);
-      res.status(500).json({ error: 'Bridge Offline. All scrapers failed.' });
+      return res.status(500).json({ error: e.message });
+    } finally {
+      if (browser) await browser.close();
     }
   });
 
